@@ -2227,7 +2227,7 @@ function MenuData_LoadMarker(src,eventdata)
     end
     
     file_path = fullfile(dirname, filename);
-    [pathstr_dummy,name_dummy,extension,versn] = fileparts(file_path);    
+    [pathstr_dummy,name_dummy,extension] = fileparts(file_path);    
     
     load(file_path); % loads pos_xy
     

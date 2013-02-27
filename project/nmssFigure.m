@@ -1047,7 +1047,7 @@ function menu_SaveAs_Callback(hObject, eventdata, handles)
     end
     
     % check for extension if user hasn't given any, append .mat at the end
-    [pathstr,name,ext,versn] = fileparts(filename);
+    [pathstr,name,ext] = fileparts(filename);
     if (isempty(ext))
         filename = [filename,'.mat'];
     end
@@ -1662,7 +1662,7 @@ function menuLoadMarkerPos_Callback(hObject, eventdata, handles)
     end
     
     file_path = fullfile(dirname, filename);
-    [pathstr_dummy,name_dummy,extension,versn] = fileparts(file_path);    
+    [pathstr_dummy,name_dummy,extension] = fileparts(file_path);    
     
     load(file_path); % loads pos_xy
     

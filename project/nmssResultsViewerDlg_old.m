@@ -131,7 +131,7 @@ function InitDlg(handles)
     nmssResultsViewerDlg_Data.max_intensity = Inf;
     
     % register file name
-    [fpart,fname,fext,fversn] = fileparts(nmssResultsViewerDlg_Data.results_file_path);
+    [fpart,fname,fext] = fileparts(nmssResultsViewerDlg_Data.results_file_path);
     
         
     dlgname = get(handles.nmssResultsViewerDlg, 'Name');

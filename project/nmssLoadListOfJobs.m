@@ -99,7 +99,7 @@ function [list_of_jobs msr_info real_sp_img] = nmssLoadListOfJobs(input_dir)
                     continue;
                 end
                 
-                [file.pathstr,file.name,file.ext,file.versn] = fileparts(current_dir_item.name);
+                [file.pathstr,file.name,file.ext] = fileparts(current_dir_item.name);
                 
                 if (~strcmp(lower(file.ext),'.mat'))
                     continue;

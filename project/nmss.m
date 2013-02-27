@@ -106,7 +106,7 @@ function nmss_OpeningFcn(hObject, eventdata, handles, varargin)
 
     % default working dir
     nmss_path = which('nmss'); % find path of this script (nmss.m)
-    [app.defaultDir,name,ext,versn] = fileparts(nmss_path);
+    [app.defaultDir,name,ext] = fileparts(nmss_path);
     if (isfield(app, 'last_woring_dir'))
         doc.workDir = app.last_woring_dir;
     else
@@ -959,7 +959,7 @@ function LoadApplicationSettings()
     % init application settings
     % default working dir
     nmss_path = which('nmss');
-    [app.defaultDir,name,ext,versn] = fileparts(nmss_path);
+    [app.defaultDir,name,ext] = fileparts(nmss_path);
 
     % pixel to micrometer calibration data
     app.calidata.micron_per_px.x = 1;

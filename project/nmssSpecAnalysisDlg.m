@@ -886,7 +886,7 @@ function btnBrowseWLSpectra_Callback(hObject, eventdata, handles)
     white_light = ones(image_x_size,1); % column vector
     
     file_path = fullfile(dirname, filename);
-    [pathstr_dummy,name_dummy,extension,versn] = fileparts(file_path);    
+    [pathstr_dummy,name_dummy,extension] = fileparts(file_path);    
     
     if (strcmp(extension, '.mat'))
         try
@@ -1967,7 +1967,7 @@ function btnSaveToWorkDir_Callback(hObject, eventdata, handles)
     end
     
     % check for extension if user hasn't given any, append .mat at the end
-    [pathstr,name,ext,versn] = fileparts(filename);
+    [pathstr,name,ext] = fileparts(filename);
     if (isempty(ext))
         filename = [filename,'.mat'];
     end
@@ -2318,7 +2318,7 @@ function menuLoadAnalysisSettings_Callback(hObject, eventdata, handles)
     end
     
     file_path = fullfile(dirname, filename);
-    [pathstr_dummy,name_dummy,extension,versn] = fileparts(file_path);    
+    [pathstr_dummy,name_dummy,extension] = fileparts(file_path);    
     
     load(file_path); % loads analysis, roi and white_light_corr
     
