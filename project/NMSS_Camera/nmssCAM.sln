@@ -1,0 +1,37 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nmssCAM", "nmssCAM.vcproj", "{D340F62C-1067-4CC8-9F48-0547C3EA5F47}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nmssCamLib", "nmssCamLib\nmssCamLib.vcproj", "{EE835966-991C-40DE-88B0-3B0D56CC3999}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nmssCAMMultiExp", "nmssCAMMultiExp\nmssCAMMultiExp.vcproj", "{6BC967DD-678F-42B6-9F96-D949BFBB0B2B}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{D340F62C-1067-4CC8-9F48-0547C3EA5F47}.Debug.ActiveCfg = Debug|Win32
+		{D340F62C-1067-4CC8-9F48-0547C3EA5F47}.Debug.Build.0 = Debug|Win32
+		{D340F62C-1067-4CC8-9F48-0547C3EA5F47}.Release.ActiveCfg = Release|Win32
+		{D340F62C-1067-4CC8-9F48-0547C3EA5F47}.Release.Build.0 = Release|Win32
+		{EE835966-991C-40DE-88B0-3B0D56CC3999}.Debug.ActiveCfg = Debug|Win32
+		{EE835966-991C-40DE-88B0-3B0D56CC3999}.Debug.Build.0 = Debug|Win32
+		{EE835966-991C-40DE-88B0-3B0D56CC3999}.Release.ActiveCfg = Release|Win32
+		{EE835966-991C-40DE-88B0-3B0D56CC3999}.Release.Build.0 = Release|Win32
+		{6BC967DD-678F-42B6-9F96-D949BFBB0B2B}.Debug.ActiveCfg = Debug|Win32
+		{6BC967DD-678F-42B6-9F96-D949BFBB0B2B}.Debug.Build.0 = Debug|Win32
+		{6BC967DD-678F-42B6-9F96-D949BFBB0B2B}.Release.ActiveCfg = Release|Win32
+		{6BC967DD-678F-42B6-9F96-D949BFBB0B2B}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal

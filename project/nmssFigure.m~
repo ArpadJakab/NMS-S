@@ -1,0 +1,670 @@
+function varargout = nmssFigure(varargin)
+% NMSSFIGURE M-file for nmssFigure.fig
+%      NMSSFIGURE, by itself, creates a new NMSSFIGURE or raises the existing
+%      singleton*.
+%
+%      H = NMSSFIGURE returns the handle to a new NMSSFIGURE or the handle to
+%      the existing singleton*.
+%
+%      NMSSFIGURE('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in NMSSFIGURE.M with the given input arguments.
+%
+%      NMSSFIGURE('Property','Value',...) creates a new NMSSFIGURE or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before nmssFigure_OpeningFunction gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to nmssFigure_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Copyright 2002-2003 The MathWorks, Inc.
+
+% Edit the above text to modify the response to help nmssFigure
+
+% Last Modified by GUIDE v2.5 16-Dec-2008 20:14:14
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @nmssFigure_OpeningFcn, ...
+                   'gui_OutputFcn',  @nmssFigure_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before nmssFigure is made visible.
+function nmssFigure_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to nmssFigure (see VARARGIN)
+
+
+    % Choose default command line output for nmssFigure
+    handles.output = hObject;
+    
+    % store handle of this dialog (or call it figure)
+    global app;
+    app.nmssFigure = hObject;
+
+    global nmssFigureData;
+    global doc;
+    
+    % get the original dimensions of the window and its GUI elements
+    % (needed for resizing informaions)
+    win_size = get(hObject, 'Position');
+    canvas_size = get(handles.canvasFigureAxes, 'Position');
+    nmssFigureData.canvas.origpos.y = canvas_size(1,2);
+    nmssFigureData.canvas.origpos.x = canvas_size(1,1);
+    nmssFigureData.canvas.distfromtop = win_size(1,4) - canvas_size(1,2) - canvas_size(1,4);
+    nmssFigureData.canvas.distfromright = win_size(1,3) - canvas_size(1,1) - canvas_size(1,3);
+    
+    nmssFigureData.cur_job_index = 1;
+    job = doc.current_job(nmssFigureData.cur_job_index);
+        
+    if(length(doc.img) == 0)
+        [status camera_image] = OpenJobAndGetImage(job, doc.workDir);
+        
+        % job couldn't be opened for whatever reason let's take the next
+        % one
+        if(strcmp(status, 'ERROR'))
+            return;
+        end
+        doc.img = camera_image;
+    end
+    
+    PaintNewImage(handles.nmssFigure, handles.canvasFigureAxes, doc.img);
+    %PaintNewImage(handles);
+    
+    % display in the window title bar the file name(s) of the displayed
+    % file(s)
+    set(handles.nmssFigure, 'Name', ['NMSS Figure: ', job.filename]);
+    set(handles.editGratingCentralWL, 'String', num2str(job.central_wavelength));
+    
+    % Update handles structure
+    guidata(hObject, handles);
+
+    
+    % UIWAIT makes nmssFigure wait for user response (see UIRESUME)
+    % uiwait(handles.nmssFigure);
+
+function [status camera_image] = OpenJobAndGetImage(job, curr_dir)
+    camera_image = 0;
+    status = 'OK';
+
+    [status camera_image job] = nmssOpenJobImage(job.filename, curr_dir);
+
+    % job couldn't be opened for whatever reason let's take the next
+    % one
+    if(strcmp(status, 'ERROR'))
+        errordlg(camera_image);
+    end
+    
+    camera_image = camera_image';
+    
+
+    
+    
+% --- Outputs from this function are returned to the command line.
+function varargout = nmssFigure_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+handles.output = handles.canvasFigureAxes;
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+%
+
+function PaintNewImage(hFigure, hAxes, img)
+    global doc;
+    global nmssFigureData;
+    
+    doc.figure_axis = nmssSetAxis(doc.figure_axis.unit);
+    
+    job = doc.current_job(nmssFigureData.cur_job_index);
+    
+    % conflicting unit settings
+    % imaging mode and nanometers
+    if (job.central_wavelength == 0 && strcmp(doc.figure_axis.unit.x,'nanometer'))
+        % set axis to pixels
+        px_units.x = 'pixel';
+        px_units.y = 'pixel';
+        doc.figure_axis = nmssSetAxis(px_units);
+    
+    % spectroscopy mode and microns
+    elseif (job.central_wavelength ~= 0 && strcmp(doc.figure_axis.unit.x,'micron'))
+        % set axis to pixels
+        px_units.x = 'pixel';
+        px_units.y = 'pixel';
+        doc.figure_axis = nmssSetAxis(px_units);
+    end
+
+    full_lim.x = ([1, size(img,2)] - size(img,2) / 2.0) * doc.figure_axis.scale.current.x + doc.figure_axis.center.x;
+    full_lim.y = ([1, size(img,1)] - size(img,1) / 2.0) * doc.figure_axis.scale.current.y + doc.figure_axis.center.y;
+    
+    nmssPaintImage('new', img, hFigure, hAxes, full_lim, full_lim);
+
+
+
+%
+function RefreshImage(hFigure, hAxes, img)
+%function RefreshImage(handles)
+    global doc;
+
+    full_lim.x = ([1, size(img,2)] - size(img,2) / 2.0) * doc.figure_axis.scale.current.x + doc.figure_axis.center.x;
+    full_lim.y = ([1, size(img,1)] - size(img,1) / 2.0) * doc.figure_axis.scale.current.y + doc.figure_axis.center.y;
+
+    figure(hFigure);
+    current_limits.x = xlim;
+    current_limits.y = ylim;
+    
+    nmssPaintImage('refresh', img, hFigure, hAxes, full_lim, current_limits);
+
+
+% --- Executes on button press in btnPan.
+function btnPan_Callback(hObject, eventdata, handles)
+% hObject    handle to btnPan (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    % Hint: get(hObject,'Value') returns toggle state of btnPan
+    if (get(hObject,'Value'))
+        pan on;
+    else
+        pan off;
+    end
+
+% --- Executes on button press in btnZoom.
+function btnZoom_Callback(hObject, eventdata, handles)
+% hObject    handle to btnZoom (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    % Hint: get(hObject,'Value') returns toggle state of btnZoom
+    if (get(hObject,'Value'))
+        zoom on;
+    else
+        zoom off;
+    end
+
+    
+function nmssUncheckZoomAndPan(handles)
+% handles    structure with handles and user data (see GUIDATA)
+
+% nmssUncheckZoomAndPan unchecks the Zoom and the Pan Button. Call this
+% function in case the user clicks any other buttons
+    set(handles.btnZoom, 'Value', 0);
+    zoom off;
+    set(handles.btnPan, 'Value', 0);
+    pan off;
+    
+
+
+% --- Executes on mouse press over axes background.
+function canvasFigureAxes_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to canvasFigureAxes (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in btnCalibration.
+function btnCalibration_Callback(hObject, eventdata, handles)
+% hObject    handle to btnCalibration (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    nmssUncheckZoomAndPan(handles);
+    
+    nmssCalibrationDlg();
+    nmssCalibrationDlg('Set_Figure', handles.nmssFigure);
+
+
+
+% --- Executes on button press in btnDrawLine.
+function btnDrawLine_Callback(hObject, eventdata, handles)
+% hObject    handle to btnDrawLine (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+    
+    nmssUncheckZoomAndPan(handles);
+
+    [xPos1 yPos1] = ginput(1);
+
+    nmssDrawCross(xPos1, yPos1, 3, 3);
+
+    [xPos2 yPos2] = ginput(1);
+
+    nmssDrawCross(xPos2, yPos2, 3, 3);
+
+    % draw line
+    line([xPos1; xPos2], [yPos1; yPos2], 'Color','r','LineWidth',2);
+   
+    
+    %line_length_px = sqrt((xPos2-xPos1)^2 + (yPos2-yPos1)^2);
+    if (strcmp(doc.figure_axis.unit.x,'nanometer'))
+        line_length = abs(xPos2-xPos1) * doc.figure_axis.scale.current.x;
+        txt = {['Horizontal line length is:'], [num2str(line_length, '%4.2f'), ' ', doc.figure_axis.unit.x]};
+    else
+        line_length = sqrt(((xPos2-xPos1) * doc.figure_axis.scale.current.x)^2 + ((yPos2-yPos1) * doc.figure_axis.scale.current.y)^2);
+        txt = {['Line length is:'], [num2str(line_length, '%4.2f'), ' ', doc.figure_axis.unit.x]};
+    end
+    
+    msgbox_handle = msgbox(txt,'Line Length Measurement','modal');
+    
+    uiwait(msgbox_handle);
+     
+    RefreshImage(handles.nmssFigure, handles.canvasFigureAxes, doc.img)
+    
+
+
+
+
+
+% % --- Executes on button press in rbPixels.
+% function rbPixels_Callback(hObject, eventdata, handles)
+% % hObject    handle to rbPixels (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hint: get(hObject,'Value') returns toggle state of rbPixels
+%     nmssUncheckZoomAndPan(handles);
+%     
+%     if (get(hObject,'Value'))
+%         
+%         global app;
+%         
+%         nmssRefreshImage_method(handles, app.calidata.ratio, 1);
+%         % change to pixels representation of the axes
+%         
+%         % limits defined in microns!
+%         xLimits = xlim(handles.canvasFigureAxes);
+%         yLimits = ylim(handles.canvasFigureAxes);
+%         
+%         % axis scaling now in pixels
+%         xlim(handles.canvasFigureAxes, xLimits / app.calidata.ratio.x);
+%         ylim(handles.canvasFigureAxes, yLimits / app.calidata.ratio.y);
+%     else
+%         disp('pixels 0');
+%         % this prevents the unchecking of the radiobutton if the user
+%         % clicks on it while checked
+%         set(hObject, 'Value', 1);
+%     end
+% 
+% 
+% 
+% 
+% % --- Executes on button press in rbMicrons.
+% function rbMicrons_Callback(hObject, eventdata, handles)
+% % hObject    handle to rbMicrons (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hint: get(hObject,'Value') returns toggle state of rbMicrons
+%     nmssUncheckZoomAndPan(handles);
+%     
+%     if (get(hObject,'Value'))
+%         global doc;
+%         global app;
+%         
+%         % limits defined in pixels!
+%         xLimits = xlim(handles.canvasFigureAxes);
+%         yLimits = ylim(handles.canvasFigureAxes);
+%         
+%         % axis scaling now in microns
+% 
+%         xlim(handles.canvasFigureAxes, xLimits * doc.figure_axis.scale.current.x);
+%         ylim(handles.canvasFigureAxes, yLimits * doc.figure_axis.scale.current.y);
+%         
+%         nmssRefreshImage_method(handles, app.calidata.ratio, 0);
+%         
+%     else
+%         disp('microns 0');
+%         % this prevents the unchecking of the radiobutton if the user
+%         % clicks on it while checked
+%         set(hObject, 'Value', 1);
+%     end
+% 
+    
+
+
+% --- Executes on button press in btnImageProcessing.
+function btnImageProcessing_Callback(hObject, eventdata, handles)
+% hObject    handle to btnImageProcessing (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    nmssImageEnhancementDlg();
+    nmssImageEnhancementDlg('Set_Figure', handles.nmssFigure);
+    
+    
+
+
+% --- Executes on button press in btnAnalysis.
+function btnAnalysis_Callback(hObject, eventdata, handles)
+% hObject    handle to btnAnalysis (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    nmssUncheckZoomAndPan(handles);
+    
+    % disable buttons which may interfere with the dialog
+    set(handles.btnChangeAxisUnits, 'Enable', 'off');
+    set(handles.btnCalibration, 'Enable', 'off');
+    set(handles.btnWavelengthCalibration, 'Enable', 'off');
+    set(handles.btnAnalysis, 'Enable', 'off');
+    
+    % open dialog and wait until it gets closed
+    global app;
+    app.nmssSpecAnalysisDlg = nmssSpecAnalysisDlg();
+    
+    
+    
+    
+
+function handle = nmssFigure_GetHandle()
+    handle = handles.nmssFigure;
+
+
+
+
+% --- Executes when nmssFigure is resized.
+function nmssFigure_ResizeFcn(hObject, eventdata, handles)
+% hObject    handle to nmssFigure (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% 
+% fills up the whole available area of the window with the image if the window is getting
+% resized.
+
+    win_size = get(hObject, 'Position');
+    
+    h = guihandles(hObject);
+    
+    
+    
+    ctrl_gui_size = get(h.panelControlGUI, 'Position');
+    canvas_size = get(h.canvasFigureAxes, 'Position');
+    
+    
+    global nmssFigureData;
+    canvas_size(1,2) = nmssFigureData.canvas.origpos.y;
+    canvas_size(1,4) = win_size(1,4) - nmssFigureData.canvas.origpos.y - nmssFigureData.canvas.distfromtop;
+    canvas_size(1,1) = nmssFigureData.canvas.origpos.x;
+    canvas_size(1,3) = win_size(1,3) - nmssFigureData.canvas.origpos.x - nmssFigureData.canvas.distfromright;
+    
+    set(h.canvasFigureAxes, 'Position', canvas_size);
+     
+
+
+
+
+% --- Executes when user attempts to close nmssFigure.
+function nmssFigure_CloseRequestFcn(hObject, eventdata, handles)
+% hObject    handle to nmssFigure (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    % clear global variable from the memory. this variable is only used in
+    % this m-file
+    clear nmssFigureData;
+    
+    global app;
+    if (ishandle(app.nmssSpecAnalysisDlg))
+        delete(app.nmssSpecAnalysisDlg);
+    end
+
+% Hint: delete(hObject) closes the figure
+delete(hObject);
+
+
+
+
+% --- Executes on button press in btnYCrosssection.
+function btnYCrosssection_Callback(hObject, eventdata, handles)
+% hObject    handle to btnYCrosssection (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% diaplays the y-crossection of the image at the position selected by the
+% user with the mouse
+    
+    % select the top left corner of ROI
+    [start_x, start_y] = ginput(1);
+    
+    global doc;
+    
+    crosssec = doc.img(1:size(doc.img,1),floor(start_x));
+    crosssec_mean = mean(crosssec);
+    crosssec_median = median(crosssec); % this is usually equal with the background
+        
+    crossec_minus_mean = crosssec - (crosssec_mean + crosssec_median) / 2;
+    indices_of_non_zero_values = find(crossec_minus_mean > 0);
+    
+    crossec_minus_mean_positive = zeros(size(crossec_minus_mean));
+    crossec_minus_mean_positive(indices_of_non_zero_values) = crossec_minus_mean(indices_of_non_zero_values);
+    
+    left_of_peak = crossec_minus_mean_positive(1:floor(start_y),1);
+    right_of_peak = crossec_minus_mean_positive(floor(start_y)+1:size(crosssec,1),1);
+    
+    index_of_right_side_of_peak = find(right_of_peak == 0, 1,'first') + floor(start_y);
+    index_of_left_side_of_peak = find(left_of_peak == 0, 1,'last');
+    
+%     figure('Name','Y-Crossection - processed');
+%     plot(crossec_minus_mean_positive);
+    figure('Name','Y-Crossection');
+    plot(crosssec);
+    y_limits = ylim
+    disp([index_of_left_side_of_peak index_of_left_side_of_peak]);
+    
+    line([ceil(start_y) ceil(start_y)], ylim, ...
+        'Color', 'k','LineWidth', 1, 'LineStyle', '-.');
+    line([index_of_left_side_of_peak index_of_left_side_of_peak], ylim, ...
+        'Color', 'r','LineWidth', 1, 'LineStyle', '-.');
+    line([index_of_right_side_of_peak index_of_right_side_of_peak], ylim, ...
+        'Color', 'r','LineWidth', 1, 'LineStyle', '-.');
+    
+
+
+
+% --- Executes on button press in btnWavelengthCalibration.
+function btnWavelengthCalibration_Callback(hObject, eventdata, handles)
+% hObject    handle to btnWavelengthCalibration (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+    if (strcmp(doc.figure_axis.unit.x,'nanometer'))
+        errtxt = {['Current x-axis unit is set to nanometers, please change to pixels and start the Wavelength Calibration again!']};
+        errordlg(errtxt );
+        return;
+    end
+
+    % disable buttons wich start functions wich may interfere with the
+    % wavelength calibration
+    set(handles.btnCalibration , 'Enable','off');
+    set(handles.btnChangeAxisUnits , 'Enable','off');
+    set(handles.btnWavelengthCalibration , 'Enable','off');
+    set(handles.btnAnalysis , 'Enable','off');
+    
+    nmssWavelengthCalDlg('Set_Figure', handles.nmssFigure);
+    % wait until the dialog gets closed
+    uiwait(nmssWavelengthCalDlg());
+
+    % enable buttons wich start functions wich may interfere with the
+    % wavelength calibration
+    set(handles.btnCalibration , 'Enable','on');
+    set(handles.btnChangeAxisUnits , 'Enable','on');
+    set(handles.btnWavelengthCalibration , 'Enable','on');
+    set(handles.btnAnalysis , 'Enable','on');
+    
+
+
+% --- Executes on button press in btnChangeAxisUnits.
+function btnChangeAxisUnits_Callback(hObject, eventdata, handles)
+% hObject    handle to btnChangeAxisUnits (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+    
+    nmssUncheckZoomAndPan(handles);
+
+    orig_axis = doc.figure_axis;
+    
+    
+    uiwait(nmssFigureAxiesUnitDlg());
+    
+    % user pressed cancel
+    if (strcmp(orig_axis.unit.x, doc.figure_axis.unit.x) && strcmp(orig_axis.unit.y, doc.figure_axis.unit.y))
+        return;
+    end
+
+    % limits defined in pixels!
+    xLimits = xlim(handles.canvasFigureAxes);
+    yLimits = ylim(handles.canvasFigureAxes);
+
+    new_lim.x = xLimits;
+    new_lim.y = yLimits;
+    
+    % initialize the full size of the image with the pixel values
+    full_lim.x = [1, size(doc.img,2)];
+    full_lim.y = [1, size(doc.img,1)];
+    
+    disp(orig_axis.unit.x);
+    if (strcmp(orig_axis.unit.x ,'pixel'))
+        % get the current axis limits in the defined units
+        [new_lim.x new_lim.y] = nmssPixel_2_Unit(xLimits, yLimits, doc.figure_axis.unit);
+        % get the full image size in the defined units
+        [full_lim.x full_lim.y] = nmssPixel_2_Unit([1, size(doc.img,2)], [1, size(doc.img,1)],doc.figure_axis.unit);
+    else
+        % figure limits unit was nanometer (if spectrogrphic mode was active) or 
+        % micrometer (imaging mode) now we want them in pixels
+        % now we have to take the inverse of the scaling factors as we go
+        % back to pixels and the scaling facto is defined as <unit> / pixel
+        [new_lim.x, new_lim.y] = nmssUnit_2_Pixel(xLimits, yLimits, orig_axis.unit)
+    end
+    
+    nmssPaintImage('new', doc.img, handles.nmssFigure , handles.canvasFigureAxes, full_lim, new_lim);
+   
+%
+
+
+
+function editGratingCentralWL_Callback(hObject, eventdata, handles)
+% hObject    handle to editGratingCentralWL (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editGratingCentralWL as text
+%        str2double(get(hObject,'String')) returns contents of editGratingCentralWL as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function editGratingCentralWL_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editGratingCentralWL (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+
+
+
+
+% --- Executes on button press in pbPrevImage.
+function pbPrevImage_Callback(hObject, eventdata, handles)
+% hObject    handle to pbPrevImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    
+    global nmssFigureData;
+    global doc;
+
+    if (nmssFigureData.cur_job_index > 1)
+        
+        nmssFigureData.cur_job_index = nmssFigureData.cur_job_index - 1;
+        
+        job = doc.current_job(nmssFigureData.cur_job_index);
+
+        % set mouse cursor to busy (watch)
+        set(handles.nmssFigure,'Pointer','watch');
+        [status camera_image] = OpenJobAndGetImage(job, doc.workDir);
+        % switch back the busy cursor to the normal arrow
+        set(handles.nmssFigure,'Pointer','arrow');
+        if (~strcmp(status,'OK'))
+            return;
+        end
+        
+        % end of the list of selected jobs reached -> switch off the button
+        if (nmssFigureData.cur_job_index == 1)
+            set(hObject,'Enable','off');
+        end
+        
+        % activate the other button
+        set(handles.pbNextImage,'Enable','on');
+        
+        
+        RefreshImage(handles.nmssFigure, handles.canvasFigureAxes, camera_image);
+        set(handles.nmssFigure, 'Name', ['NMSS Figure: ', job.filename]);
+    else
+        set(hObject,'Enable','off');        
+    end
+
+
+
+% --- Executes on button press in pbNextImage.
+function pbNextImage_Callback(hObject, eventdata, handles)
+% hObject    handle to pbNextImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    global nmssFigureData;
+    global doc;
+
+    if (nmssFigureData.cur_job_index < length(doc.current_job))
+        
+        nmssFigureData.cur_job_index = nmssFigureData.cur_job_index + 1;
+        
+        job = doc.current_job(nmssFigureData.cur_job_index);
+
+        % set mouse cursor to busy (watch)
+        set(handles.nmssFigure,'Pointer','watch');
+        [status camera_image] = OpenJobAndGetImage(job, doc.workDir);
+        % switch back the busy cursor to the normal arrow
+        set(handles.nmssFigure,'Pointer','arrow');
+        if (~strcmp(status,'OK'))
+            return;
+        end
+        
+        % end of the list of selected jobs reached -> switch off the button
+        if (nmssFigureData.cur_job_index == length(doc.current_job))
+            set(hObject,'Enable','off');
+        end
+        % activate the other button
+        set(handles.pbPrevImage,'Enable','on');
+        
+        RefreshImage(handles.nmssFigure, handles.canvasFigureAxes, camera_image);
+        set(handles.nmssFigure, 'Name', ['NMSS Figure: ', job.filename]);
+    else
+        set(hObject,'Enable','off');        
+    end
+    
+
+

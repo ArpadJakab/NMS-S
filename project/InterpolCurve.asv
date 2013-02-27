@@ -1,0 +1,47 @@
+function y = InterpolCurve(data_pairs, x)
+
+% This script creates a function that returns y = f(x), that is defined by 
+% the value pairs 'data_pairs'. Mathmatically we have initially: data_pairs(:,2) = f(data_pairs(:,1))
+% that defines a curve. We use interpolation and extrapolation methods to
+% get a value for arbitrary values
+% IN:
+% data_pairs:   value pairs where x-values are in the 1st row and y (or function values) are
+%               in the 2nd row
+% x:            the x value (or values, as it can be a vector, too) for which y=f(x) is to be calculated
+% OUT:
+% y:            y = f(x)
+
+
+ld = length(data_pairs(1,:));
+lx = length(x);
+y = zeros(1, lx);
+
+sorted_data_pairs = sortrows(data_pairs', 1)';
+
+for i=1:lx
+    
+    low_index = find(sorted_data_pairs(1,:) < x(i), 1, 'last');
+    high_index = find(sorted_data_pairs(1,:) > x(i), 1, 'first');
+    
+    if (isempty(low_index))
+        % extrapolate
+        b = (sorted_data_pairs(2, high_index+1) - sorted_data_pairs(2, high_index)) / ...
+            (sorted_data_pairs(1, high_index+1) - sorted_data_pairs(1, high_index));
+        y1 = sorted_data_pairs(2, high_index);
+        a1 = sorted_data_pairs(1, low_index);
+    elseif (isempty(high_index))
+        % extrapolate
+        b = (sorted_data_pairs(2, low_index) - sorted_data_pairs(2, low_index-1)) / ...
+            (sorted_data_pairs(1, low_index) - sorted_data_pairs(1, low_index-1));
+        y1 = sorted_data_pairs(2, low_index);
+        a1 = sorted_data_pairs(1, low_index);
+    else
+        % interpolate
+        b = (sorted_data_pairs(2, high_index) - sorted_data_pairs(2, low_index)) / ...
+            (sorted_data_pairs(1, high_index) - sorted_data_pairs(1, low_index));
+        y1 = sorted_data_pairs(2, low_index);
+        a1 = sorted_data_pairs(1, low_index);
+    end
+    
+    y(i) = y1 + b * (x(i) - a1);
+end

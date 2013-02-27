@@ -1,0 +1,190 @@
+function [peak_max peak_FWHM peak_max_int fit_x fit_y str_errmsg] = nmssGetMaxAndFWHM(spec, spec_smoothed, x_axis_nm, get_min_FWHM, varargin)
+% returns the location of the spectrum maximum and Full Width at Half
+% Maximum in eV
+%
+% spec - a row vector of the background corrected, white light normalized
+%           spectrum intensity in nanometers
+% spec_smoothed - a row vector of the smoothed spectrum - useful for
+%           determining the full width at half max
+% x_axis_nm - a row vector containing the wavelenght values. Its length must
+% match that of 'spec'
+% get_min_FWHM - flag: 2 - only paeks are taken which fullfill following
+%                          condition: max_hwhm > min_hwhm * ext_factor, where max_hwhm = max half
+%                          width at half maximum, min_hwhm - min half width at half max, ext_factor
+%                          = varargin{1}
+%              - flag: 1 - the smallest possible FWHM is taken (only the narrow side of the peak is considered)
+%              - flag: 0 - the normal FWHM is taken (left and right side of the peak is considered)
+% 
+
+    peak_max = NaN;
+    peak_FWHM = NaN;
+    peak_max_int = NaN;
+    fit_x = x_axis_nm;
+    fit_y = spec;
+    str_errmsg = '';
+    
+%     % use the photonic energy-momentum dispersion relation in vacuum to calculate photon
+%     % energies from the wavelength
+%     x_axis_eV = 1240 ./ x_axis_nm;
+%     % ordering x-axis to have low energy at low vector indices
+%     if (size(x_axis_eV, 1) ~= 1) 
+%         x_axis_eV = x_axis_eV'; 
+%     end
+%     x_axis_eV = fliplr(x_axis_eV);
+%     
+%     
+%     % adjusting the spectra to the flipped x-axis
+%     if (size(spec, 1) ~= 1) 
+%         spec = spec'; 
+%     end
+%     spec_eV = fliplr(spec);
+    
+    [x_axis_eV, spec_eV] = nmssConvertGraph_nm_2_eV(x_axis_nm, spec);
+    [x_axis_eV, smooth_spec_eV] = nmssConvertGraph_nm_2_eV(x_axis_nm, spec_smoothed);
+
+    [max_int, max_pos] = max(smooth_spec_eV);
+    look_for_max_start_index = ceil(length(smooth_spec_eV) * 0.1);
+    look_for_max_stop_index = floor(length(smooth_spec_eV) * 0.9);
+    if (max_pos < look_for_max_start_index)
+        [max_int, tmp_max_pos] = max(smooth_spec_eV(look_for_max_start_index:end));
+        max_pos = look_for_max_start_index + tmp_max_pos - 1;
+    end
+    if (max_pos > look_for_max_stop_index)
+        [max_int, tmp_max_pos] = max(smooth_spec_eV(look_for_max_start_index:look_for_max_stop_index));
+        max_pos = look_for_max_start_index + tmp_max_pos - 1;
+    end
+    peak_max_pos_raw = max_pos;
+    
+    peak_max_int_raw = spec_eV(floor(peak_max_pos_raw));% find max peak value (just an estimation)
+    peak_min_int  = min(smooth_spec_eV);
+
+    % check if intensity is high enough
+    if (peak_max_int  < 100)
+        str_errmsg = ['Peak max ', num2str(peak_max_int_raw) ,' falls below 100. This is too small for analysis'];
+        return;
+    end
+
+    
+    % FINDING MAXIMUM HERE:
+    % fit a parabolic curve into the raw data to get the maximum position
+    % of the peak (this is especially useful if the peak is rather noisy)
+    
+    % get top 20% of the peak
+    left_of_peak = smooth_spec_eV(1 : floor(peak_max_pos_raw));
+    right_of_peak = smooth_spec_eV(floor(peak_max_pos_raw)+1 : length(smooth_spec_eV));
+    
+    peak_min_int = 0; % peaks are backgrouond corrected thus zero is the minimum intensity
+    
+       
+    FW80M_index.r = find(right_of_peak > peak_min_int + (peak_max_int_raw - peak_min_int) * 0.8, 1,'last') + peak_max_pos_raw;
+    FW80M_index.l = find(left_of_peak > peak_min_int + (peak_max_int_raw - peak_min_int) * 0.8, 1,'first');
+    if (isempty(FW80M_index.r) || isempty(FW80M_index.r))
+        % no peak in the definition range
+        [dummy, max_index]  = max(spec_eV);
+    else
+        % cut out the upper 40% per cent of the peak an fit it
+        input_fit_range = FW80M_index.l:FW80M_index.r;
+        
+        [fit_y, fittedindices] = nmssFitPeak(x_axis_eV(input_fit_range), spec_eV(input_fit_range), 'poly2');
+
+        if (~isempty(fit_y))
+            % successful fitting
+            [fit_max_int fit_max_index] = max(fit_y);
+
+            max_index = FW80M_index.l + fit_max_index - 1;
+            fit_x = x_axis_eV(input_fit_range);
+            % get the mean value of the raw spectra around the fit max
+            % position
+            lgth = length(spec_eV);
+            if (max_index >= 2 && max_index <= lgth-1)
+                peak_max_int = mean([spec_eV(max_index-1), spec_eV(max_index), spec_eV(max_index + 1)]);
+            elseif (max_index == 1 && max_index <= lgth-1)
+                peak_max_int = mean([spec_eV(max_index), spec_eV(max_index + 1)]);
+            elseif (max_index >= 2 && max_index == lgth)
+                peak_max_int = mean([spec_eV(max_index-1), spec_eV(max_index)]);
+            else
+                peak_max_int = spec_eV(max_index);
+            end
+                
+%             if (fit_max_int < smooth_spec_eV(max_index))
+%                 peak_max_int = smooth_spec_eV(max_index);
+%             else
+%                 % get the mean value of the raw spectra around the fit max position
+%                 peak_max_int = mean([spec_eV(fit_max_index-1), spec_eV(fit_max_index), spec_eV(fit_max_index + 1)]);
+%             end
+        else
+            % fitting failed, use max of the smoothed spec
+            [peak_max_int, max_index]  = max(smooth_spec_eV);
+        end
+    end
+    
+        
+    % get the position of the maximum in eV
+    try 
+        peak_max = x_axis_eV(max_index);
+    catch
+        keyboard;
+    end
+
+    left_of_peak = smooth_spec_eV(1 : floor(max_index));
+    right_of_peak = smooth_spec_eV(floor(max_index)+1 : length(smooth_spec_eV));
+    
+    
+
+    % FINDING FWHM HERE:
+    % look for data at half maximum left and right to the peak
+    FWHM_index.r = find(right_of_peak < peak_min_int + (peak_max_int - peak_min_int)/2.0, 1,'first') + floor(max_index);
+    FWHM_index.l = find(left_of_peak < peak_min_int + (peak_max_int - peak_min_int)/2.0, 1,'last');
+
+    
+    % found anything? if not return as the paek analysis can not be
+    % performed
+    if (isempty(FWHM_index.r))
+        %FWHM_index.r = length(x_axis_eV);
+        str_errmsg = {'FWHM right side (in eV picture) could not be found!'};
+        return;
+    end
+    if (isempty(FWHM_index.l))
+        %FWHM_index.l = 1;
+        str_errmsg = {'FWHM left side (in eV picture) could not be found!'};
+        return;
+    end
+    
+    % higher end index of the peak
+    FWHM_wl_r = x_axis_eV(FWHM_index.r);
+    % lower end index of the peak
+    FWHM_wl_l = x_axis_eV(FWHM_index.l);
+    
+    fwhm.full = abs(FWHM_wl_r - FWHM_wl_l);
+    fwhm.leftside = abs( FWHM_wl_l - peak_max);
+    fwhm.rightside = abs( FWHM_wl_r - peak_max);
+
+    % set return variables
+    if (get_min_FWHM == 2)
+        % check if we have a nice peak
+        % due to the fact that the resonance spectrum is a Lorentzian curve
+        % which is symmetric
+        % http://mathworld.wolfram.com/CauchyDistribution.html
+        % http://en.wikipedia.org/wiki/Cauchy_distribution
+        % we only have to check if the peak symmetriy is only violated in a
+        % narrow range, this range will be tuneable
+        ext_factor = 1.3; % default
+        if (length(varargin) >= 1)
+            ext_factor = varargin{1};
+        end
+        min_hwhm = min([fwhm.leftside, fwhm.rightside]);
+        max_hwhm = max([fwhm.leftside, fwhm.rightside]);
+        % if the maximum half width at half max is ext_factor times larger
+        % or above than min_hwhm don't accept the peak
+        if (max_hwhm > min_hwhm * ext_factor)
+            str_errmsg = ['Peak failed the symmetry check. One side is ', num2str(max_hwhm / min_hwhm) ,' times larger than the other! The symmetry limit is: ', num2str(ext_factor)];
+            return;
+        end
+        peak_FWHM = fwhm.full;
+    elseif (get_min_FWHM == 1)
+        peak_FWHM = 2 * min([fwhm.leftside, fwhm.rightside]);
+    else
+        peak_FWHM = fwhm.full;
+    end
+
+

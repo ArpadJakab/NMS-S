@@ -1,0 +1,1554 @@
+function varargout = nmssSpecAnalysisDlg(varargin)
+% NMSSSPECANALYSISDLG M-file for nmssSpecAnalysisDlg.fig
+%      NMSSSPECANALYSISDLG, by itself, creates a new NMSSSPECANALYSISDLG or raises the existing
+%      singleton*.
+%
+%      H = NMSSSPECANALYSISDLG returns the handle to a new NMSSSPECANALYSISDLG or the handle to
+%      the existing singleton*.
+%
+%      NMSSSPECANALYSISDLG('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in NMSSSPECANALYSISDLG.M with the given input arguments.
+%
+%      NMSSSPECANALYSISDLG('Property','Value',...) creates a new NMSSSPECANALYSISDLG or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before nmssSpecAnalysisDlg_OpeningFunction gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to nmssSpecAnalysisDlg_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Copyright 2002-2003 The MathWorks, Inc.
+
+% Edit the above text to modify the response to help nmssSpecAnalysisDlg
+
+% Last Modified by GUIDE v2.5 14-Apr-2008 16:10:48
+
+% Begin initialization code - DO NOT EDITPARTICLEBGROIDISTANCE
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @nmssSpecAnalysisDlg_OpeningFcn, ...
+                   'gui_OutputFcn',  @nmssSpecAnalysisDlg_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDITPARTICLEBGROIDISTANCE
+
+
+% --- Executes just before nmssSpecAnalysisDlg is made visible.
+function nmssSpecAnalysisDlg_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to nmssSpecAnalysisDlg (see VARARGIN)
+% Choose default command line output for nmssSpecAnalysisDlg
+handles.output = hObject;
+
+    % parent of this dialog is nmssFigure and its parent is the main window
+    %handles.parent = nmssFigure('nmssFigure_GetHandle');
+    
+    global doc;
+    
+    roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+    roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+    roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+
+    % if background data exists enable background ROI section
+    if (doc.roi.bg1.exists == 1)
+        set(handles.cxEnableBackground, 'Value', 1);
+    end
+    
+    set(handles.rbParticle, 'Value', 1);
+    set(handles.editRectStartX, 'String', num2str(roi.particle.x, '%4.3f') );
+    set(handles.editRectStartY, 'String', num2str(roi.particle.y, '%4.3f') );
+    set(handles.editRectEndX, 'String', num2str(roi.particle.wx, '%4.3f') );
+    set(handles.editRectEndY, 'String', num2str(roi.particle.wy, '%4.3f') );
+    
+    % check if white light correction can be applied.
+    if (size(doc.white_light_corr.data,1) ~= size(doc.img,2))
+        % white light data and image size do not match
+        set(handles.btnShowWhiteLight, 'Enable', 'off');
+        set(handles.cxEnableWLCorrection, 'Enable', 'off');
+        set(handles.cxEnableWLCorrection, 'Value', 0);
+    else
+        % white light data has the correct size
+        set(handles.cxEnableWLCorrection, 'Value', doc.white_light_corr.enable);
+    end
+    set(handles.editPathWLSpectra, 'String', doc.white_light_corr.filepath);
+    
+    set(handles.editStdDev_Weighting, 'String', num2str(doc.analysis.std_weighing, '%2.2f'));
+    set(handles.editROIExtendY, 'String', num2str(doc.analysis.ROIExtendY, '%2.0f'));
+    set(handles.editParticleBgROIDistance, 'String', num2str(doc.analysis.particleBgROIDistance, '%2.0f'));
+    
+    % enable currently selected peak identification method GUI
+    set(handles.rbPeakIdentifcation_YMax,'Value', 0.0);
+    set(handles.rbPeakIdentifcationAutomatic,'Value', 0.0);
+
+    
+    if (strcmp(doc.analysis.method,'manual'))
+        set(handles.rbPeakIdentifcation_YMax,'Value', 1.0);
+    elseif (strcmp(doc.analysis.method,'automatic'))
+        set(handles.rbPeakIdentifcationAutomatic,'Value', 1.0);
+    end
+%     if (strcmp(doc.analysis.method,'absolute_maximum'))
+%         set(handles.rbPeakIdentifcation_YMax,'Value', 1.0);
+%     elseif (strcmp(doc.analysis.method,'fit_background'))
+%         set(handles.rbPeakIdentifcation_FitBG,'Value', 1.0);
+%     end
+    
+    UpdateROIs(handles);
+    
+
+% Update handles structure
+guidata(hObject, handles);
+
+% UIWAIT makes nmssSpecAnalysisDlg wait for user response (see UIRESUME)
+% uiwait(handles.nmssSpecAnalysisDlg);
+
+% --- Outputs from this function are returned to the command line.
+function varargout = nmssSpecAnalysisDlg_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = hObject;
+
+
+function UpdateROIs(handles)
+% this helper function updates the handles structure for the ROI
+% definitions. this function is called from all functions, which change the
+% ROI-s
+    RefreshImage(handles);
+
+    % Update handles structure
+    guidata(handles.nmssSpecAnalysisDlg, handles);
+
+function editRectStartX_Callback(hObject, eventdata, handles)
+% hObject    handle to editRectStartX (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editRectStartX as text
+%        str2double(get(hObject,'String')) returns contents of editRectStartX as a double
+    global doc;
+
+if (nmssValidateNumericEdit(hObject, 'Start X'))
+    corner_x = floor(str2num(get(hObject, 'String')));
+    
+    if(get(handles.rbParticle, 'Value'))
+        roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        roi.particle.exists = 1;
+        roi.particle.x = corner_x;
+        doc.roi.particle = ConvertROIUnit2Pixel(roi.particle, doc.figure_axis.unit)
+    elseif(get(handles.rbBackground1, 'Value'))
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+        roi.bg1.exists = 1;
+        roi.bg1.x = corner_x;
+        doc.roi.bg1 = ConvertROIUnit2Pixel(roi.bg1, doc.figure_axis.unit)
+    elseif(get(handles.rbBackground2, 'Value'))
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+        roi.bg2.exists = 1;
+        roi.bg2.x = corner_x;
+        doc.roi.bg2 = ConvertROIUnit2Pixel(roi.bg2, doc.figure_axis.unit)
+    end
+    
+    UpdateROIs(handles);
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function editRectStartX_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editRectStartX (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+function editRectStartY_Callback(hObject, eventdata, handles)
+% hObject    handle to editRectStartY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editRectStartY as text
+%        str2double(get(hObject,'String')) returns contents of editRectStartY as a double
+    global doc;
+
+
+if (nmssValidateNumericEdit(hObject, 'Start Y'))
+    
+    corner_y = floor(str2num(get(hObject, 'String')));
+    
+    if(get(handles.rbParticle, 'Value'))
+        roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        roi.particle.exists = 1;
+        roi.particle.y = corner_y;
+        doc.roi.particle = ConvertROIUnit2Pixel(roi.particle, doc.figure_axis.unit)
+    elseif(get(handles.rbBackground1, 'Value'))
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+        roi.bg1.exists = 1;
+        roi.bg1.y = corner_y;
+        doc.roi.bg1 = ConvertROIUnit2Pixel(roi.bg1, doc.figure_axis.unit)
+    elseif(get(handles.rbBackground2, 'Value'))
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+        roi.bg2.exists = 1;
+        roi.bg2.y = corner_y;
+        doc.roi.bg2 = ConvertROIUnit2Pixel(roi.bg2, doc.figure_axis.unit)
+    end
+    
+    UpdateROIs(handles);
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function editRectStartY_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editRectStartY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+
+function editRectEndX_Callback(hObject, eventdata, handles)
+% hObject    handle to editRectEndX (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editRectEndX as text
+%        str2double(get(hObject,'String')) returns contents of editRectEndX as a double
+    global doc;
+
+
+if (nmssValidateNumericEdit(hObject, 'Width X'))
+    width_x = floor(str2num(get(hObject, 'String')));
+    roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+    roi.particle.exists = 1;
+    roi.particle.wx = width_x;
+    doc.roi.particle = ConvertROIUnit2Pixel(roi.particle, doc.figure_axis.unit)
+    
+    % once particle ROI width has been cahnged the background ROI-s are no
+    % longer valid. They have to match the particle's ROI dimensions
+        % reset backgroud
+        doc.roi.bg1 = nmssResetROI();
+        doc.roi.bg1.wx = doc.roi.particle.wx;
+        doc.roi.bg1.wy = doc.roi.particle.wy;
+        doc.roi.bg2 = nmssResetROI();
+        doc.roi.bg2.wx = doc.roi.particle.wx;
+        doc.roi.bg2.wy = doc.roi.particle.wy;
+    
+    UpdateROIs(handles);
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function editRectEndX_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editRectEndX (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+
+function editRectEndY_Callback(hObject, eventdata, handles)
+% hObject    handle to editRectEndY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editRectEndY as text
+%        str2double(get(hObject,'String')) returns contents of editRectEndY as a double
+
+    global doc;
+
+if (nmssValidateNumericEdit(hObject, 'Width Y'))
+    width_y = floor(str2num(get(hObject, 'String')));
+    roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+    roi.particle.exists = 1;
+    roi.particle.wy = width_y;
+    doc.roi.particle = ConvertROIUnit2Pixel(roi.particle, doc.figure_axis.unit)
+    
+    % once particle ROI width has been cahnged the background ROI-s are no
+    % longer valid. They have to match the particle's ROI dimensions
+        % reset backgroud
+        doc.roi.bg1 = nmssResetROI();
+        doc.roi.bg1.wx = doc.roi.particle.wx;
+        doc.roi.bg1.wy = doc.roi.particle.wy;
+        doc.roi.bg2 = nmssResetROI();
+        doc.roi.bg2.wx = doc.roi.particle.wx;
+        doc.roi.bg2.wy = doc.roi.particle.wy;
+    
+    UpdateROIs(handles);
+end
+    
+
+
+% --- Executes during object creation, after setting all properties.
+function editRectEndY_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editRectEndY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+% --- Executes on button press in btnGetRectFromMouse.
+function btnGetRectFromMouse_Callback(hObject, eventdata, handles)
+% hObject    handle to btnGetRectFromMouse (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    
+    % activate image
+    global doc;
+    global app;
+    if (ishandle(app.nmssFigure))
+        figure(app.nmssFigure);
+    else
+        nmssFigure();
+    end
+    handles_figure = guidata(app.nmssFigure);
+    figure(handles_figure.nmssFigure);
+    
+    
+    % select particle
+    if (get(handles.rbParticle, 'Value'))
+        k = waitforbuttonpress;
+        point1 = get(gca,'CurrentPoint');    % button down detected
+        finalRect = rbbox;                   % return figure units
+        point2 = get(gca,'CurrentPoint');    % button up detected
+        
+        point1 = point1(1,1:2);              % extract x and y
+        point2 = point2(1,1:2);
+        
+        %nmssDrawRectBetween2Points(point1, point2, 1);
+
+        start_x = point1(1,1);
+        start_y = point1(1,2);
+        end_x = point2(1,1);
+        end_y = point2(1,2);
+        
+        % get the top left corner of the rectangle
+        if (end_x < start_x)
+            temp = end_x;
+            end_x = start_x;
+            start_x = temp;
+        end
+        if (end_y < start_y)
+            temp = end_y;
+            end_y = start_y;
+            start_y = temp;
+        end
+            
+        % snap rectangle's coordinates to the outer boundary of the pixels
+        % contained within or which are on the rubber box line
+        corner_x = floor(start_x + 0.5);
+        end_x = ceil(end_x - 0.5);
+        corner_y = floor(start_y + 0.5);
+        end_y = ceil(end_y - 0.5);
+        
+        full_lim = nmssGetFullImageLimits(doc.figure_axis.unit);
+        if (corner_x < full_lim.x(1))
+            corner_x = full_lim.x(1);
+        elseif (end_x > full_lim.x(2))
+            end_x > full_lim.x(2);
+        end
+        
+        if (corner_y < full_lim.y(1))
+            corner_y = full_lim.y(1);
+        elseif (end_y > full_lim.y(2))
+            end_y > full_lim.y(2);
+        end
+        
+        width_x = abs(end_x - corner_x) + 1;
+        width_y = abs(end_y - corner_y) + 1;
+        
+        
+        set(handles.editRectStartX, 'String', num2str(corner_x,'%4.3f'));
+        set(handles.editRectStartY, 'String', num2str(corner_y,'%4.3f'));
+        set(handles.editRectEndX, 'String', num2str(width_x ,'%4.3f'));
+        set(handles.editRectEndY, 'String', num2str(width_y ,'%4.3f'));
+        
+        roi.particle = nmssResetROI();
+        roi.particle.exists = 1;
+        roi.particle.valid = 1;
+        roi.particle.x = corner_x;
+        roi.particle.y = corner_y;
+        roi.particle.wx = width_x;
+        roi.particle.wy = width_y;
+        
+        doc.roi.particle = ConvertROIUnit2Pixel(roi.particle, doc.figure_axis.unit);
+        
+        % reset backgroud
+        doc.roi.bg1 = nmssResetROI();
+        doc.roi.bg1.wx = doc.roi.particle.wx;
+        doc.roi.bg1.wy = doc.roi.particle.wy;
+        doc.roi.bg2 = nmssResetROI();
+        doc.roi.bg2.wx = doc.roi.particle.wx;
+        doc.roi.bg2.wy = doc.roi.particle.wy;
+        
+        
+        UpdateROIs(handles);
+        
+    elseif (get(handles.rbBackground1, 'Value'))
+        % select the top left corner of ROI
+        [start_x, start_y] = ginput(1);
+        
+        % snap rectangle's coordinates to the outer boundary of the pixels
+        % contained within or which are on the rubber box line
+        corner_x = floor(start_x + 0.5);
+        corner_y = floor(start_y + 0.5);
+        
+        full_lim = nmssGetFullImageLimits(doc.figure_axis.unit);
+        if (corner_x < full_lim.x(1))
+            corner_x = full_lim.x(1);
+        end
+        
+        if (corner_y < full_lim.y(1))
+            corner_y = full_lim.y(1);
+        end
+        
+        
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        
+        roi.bg1.exists = 1;
+        roi.bg1.valid = 1;
+        roi.bg1.x = corner_x;
+        roi.bg1.y = corner_y;
+        
+        doc.roi.bg1 = ConvertROIUnit2Pixel(roi.bg1, doc.figure_axis.unit)
+        
+        set(handles.editRectStartX, 'String', num2str(corner_x,'%4.3f'));
+        set(handles.editRectStartY, 'String', num2str(corner_y,'%4.3f'));
+        
+        % refresh rectangles on image
+        UpdateROIs(handles);
+    elseif (get(handles.rbBackground2, 'Value'))
+        
+        % select the top left corner of ROI
+        [start_x, start_y] = ginput(1);
+        
+        % snap rectangle's coordinates to the outscirt of the pixels
+        % contained within or which are on the rubber box line
+        corner_x = floor(start_x + 0.5);
+        corner_y = floor(start_y + 0.5);
+        
+        full_lim = nmssGetFullImageLimits(doc.figure_axis.unit);
+        if (corner_x < full_lim.x(1))
+            corner_x = full_lim.x(1);
+        end
+        
+        if (corner_y < full_lim.y(1))
+            corner_y = full_lim.y(1);
+        end
+        
+        
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        
+        %doc.roi.bg2.valid = 1;
+        roi.bg2.exists = 1;
+        roi.bg2.valid = 1;
+        roi.bg2.x = corner_x;
+        roi.bg2.y = corner_y;
+        
+        doc.roi.bg2 = ConvertROIUnit2Pixel(roi.bg2, doc.figure_axis.unit);
+
+        set(handles.editRectStartX, 'String', num2str(corner_x,'%4.3f'));
+        set(handles.editRectStartY, 'String', num2str(corner_y,'%4.3f'));
+        
+        % refresh rectangles on image
+        UpdateROIs(handles);
+    end
+    
+%
+function roi_def = ConvertROIUnit2Pixel(roi_in_unit, unit)
+% converts roi units to pixels
+    roi_def = nmssConvertROIUnit2Pixel(roi_in_unit, unit);   
+
+%
+function roi_def = ConvertROIPixel2Unit(roi_in_pixel, unit)
+% converts roi units from pixels to specified unit
+    roi_def = nmssConvertROIPixel2Unit(roi_in_pixel, unit);
+    
+
+
+function RefreshImage(handles)
+% refresh image (deletes old markers)
+    %nmssFigure('RefreshImage', 10);
+    %nmssFigure('RefreshImage', 10);
+    global doc;
+    global app;
+    
+    % activate or create figure window
+    if (ishandle(app.nmssFigure))
+        figure(app.nmssFigure);
+    else
+        nmssFigure();
+    end
+    figure_handles = guidata(app.nmssFigure);
+
+    full_lim = nmssGetFullImageLimits(doc.figure_axis.unit);
+    current_limits.x = xlim;
+    current_limits.y = ylim;
+    
+    nmssPaintImage('refresh', doc.img, app.nmssFigure, figure_handles.canvasFigureAxes, full_lim, current_limits);
+    
+    % get the size of half pixel in unit
+    [tmp1_x, tmp1_y] = nmssPixel_2_Unit(1, 1, doc.figure_axis.unit);
+    [tmp2_x, tmp2_y] = nmssPixel_2_Unit(1.5, 1.5, doc.figure_axis.unit);
+    half_x = abs(tmp2_x - tmp1_x);
+    half_y = abs(tmp2_y - tmp1_y);
+    
+    % get roi in unit
+    roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+    roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+    roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+    
+    % snap rectangle's coordinates to the outer boundary of the pixels
+    % contained within and on the boundary of the rectangle
+    start_x = roi.particle.x - half_x; % -0.5 to position the rectangle at the border or the ROI
+    start_y = roi.particle.y - half_y;
+    end_x = start_x + roi.particle.wx;
+    end_y = start_y + roi.particle.wy;
+    
+    if (doc.roi.particle.exists)
+        if (get(handles.rbParticle, 'Value'))
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'g');
+        else
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'r');
+        end
+    end
+    
+    start_x = roi.bg1.x - half_x;
+    start_y = roi.bg1.y - half_y;
+    end_x = start_x + roi.bg1.wx;
+    end_y = start_y + roi.bg1.wy;
+    if (doc.roi.bg1.exists)
+        if (get(handles.rbBackground1, 'Value'))
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'g');
+        else
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'r');
+        end
+    end
+    
+    start_x = roi.bg2.x - half_x;
+    start_y = roi.bg2.y - half_y;
+    end_x = start_x + roi.bg2.wx;
+    end_y = start_y + roi.bg2.wy;
+    if (doc.roi.bg2.exists)
+        if (get(handles.rbBackground2, 'Value'))
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'g');
+        else
+            nmssDrawRectBetween2Points([start_x, start_y], [end_x, end_y], 1, 'r');
+        end
+    end
+    
+
+
+
+% --- Executes on button press in rbParticle.
+function rbParticle_Callback(hObject, eventdata, handles)
+% hObject    handle to rbParticle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+
+    % Hint: get(hObject,'Value') returns toggle state of rbParticle
+    if (get(hObject,'Value'))
+        set(handles.rbBackground1, 'Value', 0);
+        set(handles.rbBackground2, 'Value', 0);
+        set(handles.editRectEndX, 'Enable', 'on');
+        set(handles.editRectEndY, 'Enable', 'on');
+
+        % get roi in unit
+        roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+        
+        set(handles.editRectStartX, 'String', num2str(roi.particle.x, '%4.3f') );
+        set(handles.editRectStartY, 'String', num2str(roi.particle.y, '%4.3f') );
+        set(handles.editRectEndX, 'String', num2str(roi.particle.wx, '%4.3f') );
+        set(handles.editRectEndY, 'String', num2str(roi.particle.wy, '%4.3f') );
+        
+        % refresh rectangles on image (draw currently selected with green line)
+        UpdateROIs(handles);
+    else
+        set(hObject,'Value', 1);
+    end
+
+
+% --- Executes on button press in btnClose.
+function btnClose_Callback(hObject, eventdata, handles)
+% hObject    handle to btnClose (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    % Update handles structure
+    
+    
+    
+    nmssSpecAnalysisDlg_CloseRequestFcn(handles.nmssSpecAnalysisDlg, eventdata, handles);
+    
+% --- Executes on button press in rbBackground1.
+function rbBackground1_Callback(hObject, eventdata, handles)
+% hObject    handle to rbBackground1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+
+    % Hint: get(hObject,'Value') returns toggle state of rbBackground1
+    if (get(hObject,'Value'))
+        set(handles.rbParticle, 'Value', 0);
+        set(handles.rbBackground2, 'Value', 0);
+        set(handles.editRectEndX, 'Enable', 'off');
+        set(handles.editRectEndY, 'Enable', 'off');
+
+        % get roi in unit
+        roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+        
+        set(handles.editRectStartX, 'String', num2str(roi.bg1.x, '%4.3f') );
+        set(handles.editRectStartY, 'String', num2str(roi.bg1.y, '%4.3f') );
+
+        % refresh rectangles on image (draw currently selected with green line)
+        UpdateROIs(handles);
+    else
+        set(hObject,'Value', 1);
+    end
+
+
+% --- Executes on button press in rbBackground2.
+function rbBackground2_Callback(hObject, eventdata, handles)
+% hObject    handle to rbBackground2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+
+    % Hint: get(hObject,'Value') returns toggle state of rbBackground2
+    if (get(hObject,'Value'))
+        set(handles.rbParticle, 'Value', 0);
+        set(handles.rbBackground1, 'Value', 0);
+        set(handles.editRectEndX, 'Enable', 'off');
+        set(handles.editRectEndY, 'Enable', 'off');
+
+        % get roi in unit
+        roi.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+        roi.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+        roi.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+
+        set(handles.editRectStartX, 'String', num2str(roi.bg2.x, '%4.3f') );
+        set(handles.editRectStartY, 'String', num2str(roi.bg2.y, '%4.3f') );
+
+        % refresh rectangles on image (draw currently selected with green line)
+        UpdateROIs(handles);
+    else
+        set(hObject,'Value', 1);
+    end
+
+
+% --- Executes on button press in cxEnableWLCorrection.
+function cxEnableWLCorrection_Callback(hObject, eventdata, handles)
+% hObject    handle to cxEnableWLCorrection (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of cxEnableWLCorrection
+    global doc;
+    doc.white_light_corr.enable = get(hObject,'Value');
+
+% --- Executes on button press in btnBrowseWLSpectra.
+function btnBrowseWLSpectra_Callback(hObject, eventdata, handles)
+% hObject    handle to btnBrowseWLSpectra (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    
+    global app;
+    global doc;
+    
+    % change to the directory of the application (this is where the white
+    % light text files are stored)
+    cd(app.defaultDir);
+    [filename, dirname] = uigetfile({'*.txt','Tab-deliminted text files (*.txt)'}, 'Load White Light - Select File');
+    
+    % change to the working directory
+    %cd(doc.workDir);
+    
+    if (filename == 0) % user pressed cancel
+        return;
+    end
+    
+    file_path = fullfile(dirname, filename);
+    
+    % what do we have in the .mat file?
+    try
+        % read tab delimited data from the text file
+        white_light = dlmread(file_path, '\t');
+        
+        % check if the imported white light spectra complies with the
+        % requirements set by the image dimension
+        % these two value must match!!!
+        num_of_white_light_datapoints = size(white_light,1);
+        global doc;
+        image_x_size = size(doc.img,2);
+        
+        if (num_of_white_light_datapoints ~= image_x_size )
+            errtxt = {['The number of data points in the imported white light spectra (', num2str(num_of_white_light_datapoints, '%d'),') ',...
+                      'does not match the x-size of the image (',num2str(image_x_size, '%d'),')!']};
+            errordlg(errtxt);
+            return;
+        end
+        
+        % check if the number of columns is equal to two, 1st column =
+        % wavelength, 2nd column = Intensity
+        if (size(white_light,2) ~= 2)
+            errtxt = {'Incorrect white light data format!';'';'There are two columns expected:';...
+                      '1st column: wavelength ';'2nd column: white light intenisty'};
+        
+            errordlg(errtxt);
+            return;
+        end
+        
+        global doc;
+        max_white_light = max(white_light(:,2));
+        doc.white_light_corr.data = [white_light(:,1), white_light(:,2) / max_white_light]; % normalize white light to max=1
+        
+        doc.white_light_corr.filepath = file_path;
+        
+        % update editParticleBgROIDistance field containing the white light spectrum
+        set(handles.editPathWLSpectra, 'String', file_path);
+        % enable show white light spectra button and other corresponding
+        % gui elements
+        set(handles.btnShowWhiteLight, 'Enable', 'on');
+        set(handles.cxEnableWLCorrection, 'Enable', 'on');
+        set(handles.cxEnableWLCorrection, 'Value', doc.white_light_corr.enable);
+    catch
+        msg_txt = lasterr();
+        errordlg(msg_txt);
+    end
+
+
+    
+function valid = IsValidROI(roi_definition, img)
+% roi_definition - the ROI structure roi.particle or roi.bg1 ... etc.
+% img - the image on which the ROI will be placed
+    valid = 1;
+    
+    % check ROIs
+    if ((roi_definition.x + roi_definition.wx - 1) > size(img,2))
+        valid = 0;
+        return;
+    end
+    
+    if ((roi_definition.y + roi_definition.wy - 1) > size(img,1))
+        valid = 0;
+        return;
+    end
+        
+    if (roi_definition.x < 1)
+        valid = 0;
+        return;
+    end
+    
+    if (roi_definition.y < 1)
+        valid = 0;
+        return;
+    end
+    
+    
+    
+function graph = GetGraphFromROI(roi, img, white_light)
+
+    % get particle data
+    corner_x = roi.particle.x;
+    corner_y = roi.particle.y;
+    width_x = roi.particle.wx;
+    width_y = roi.particle.wy;
+    roi_img = img(corner_y:corner_y+width_y-1, corner_x:corner_x+width_x-1);
+    graph.particle = sum(roi_img,1)/size(roi_img,1);
+    
+    % get particle data
+    if (roi.bg1.valid)
+        corner_x = roi.bg1.x;
+        corner_y = roi.bg1.y;
+        width_x = roi.bg1.wx;
+        width_y = roi.bg1.wy;
+        roi_img = img(corner_y:corner_y+width_y-1, corner_x:corner_x+width_x-1);
+        graph.bg = sum(roi_img,1)/size(roi_img,1);
+    else
+        graph.bg = zeros(1, size(graph.particle,2));
+    end
+    
+    % get particle data
+    if (roi.bg2.valid)
+        corner_x = roi.bg2.x;
+        corner_y = roi.bg2.y;
+        width_x = roi.bg1.wx;
+        width_y = roi.bg2.wy;
+        roi_img = img(corner_y:corner_y+width_y-1, corner_x:corner_x+width_x-1);
+        graph.bg2 = sum(roi_img,1)/size(roi_img,1);
+        
+        graph.bg = (graph.bg + graph.bg2) / 2.0;
+    end
+    
+    graph.bg_subtracted = graph.particle - graph.bg;
+    
+    % element wise division (graph.bg_subtracted is a row vector, white_light is a column vector)
+    graph.normalized = graph.bg_subtracted ./ white_light';
+    
+
+
+function valid = CheckROIs()
+% Wrapper for ROI checking methods. this function is dialog bound, it is
+% using global variables used by the dialog 
+    global doc;
+    img = doc.img;
+    
+    valid = 0;
+    
+    roi.particle = doc.roi.particle;
+    roi.bg1 = doc.roi.bg1;
+    roi.bg2 = doc.roi.bg2;
+    
+    % check particle ROI
+    if (roi.particle.exists)
+        if (~IsValidROI(roi.particle, img))
+            errordlg({'Incorrect ROI definition'; ' ';'Particle ROI extends over the image boundaries!'});
+            return;
+        end
+        doc.roi.particle.valid = 1;
+%     else
+%         % user forgot to define particle ROI (yes, sir we need it to show a
+%         % graph of a spectrum)
+%         errordlg({'Please define the ROI for a particle.';''; ...
+%             'In automatic peak identification modus the definied particle ROI x-width will be taken for all particles.'});
+%         return;
+    end
+    
+    % check background 1 ROI
+    doc.roi.bg1.valid = 0;
+    if (roi.bg1.exists)
+        if (~IsValidROI(roi.bg1, img))
+            errordlg({'Incorrect ROI definition'; ' ';'Background 1 ROI extends over the image boundaries!'});
+            return;
+        end
+        doc.roi.bg1.valid = 1;
+    end
+    
+    % check background 2 ROI
+    doc.bg2.valid = 0;
+    if (roi.bg2.exists)
+        if (~IsValidROI(roi.bg2, img))
+            errordlg({'Incorrect ROI definition'; ' ';'Background 2 ROI extends over the image boundaries!'});
+            return;
+        end
+        doc.roi.bg2.valid = 1;
+    end
+    
+    % if the ROI has survived the previous check, than it can be declared
+    % as valid ROI
+    valid = 1;
+    
+
+% --- Executes on button press in btnShowGraph.
+function btnShowGraph_Callback(hObject, eventdata, handles)
+% hObject    handle to btnShowGraph (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+
+    % set mouse cursor to busy (watch)
+    set(handles.nmssSpecAnalysisDlg,'Pointer','watch');
+
+    % check if ROIs are inside of the image
+    if (CheckROIs())
+        % get image
+        global doc;
+        img = doc.img;
+
+        % if white light correction check box is checked, use a real white
+        % light
+        if (get(handles.cxEnableWLCorrection, 'Value'))
+            white_light = doc.white_light_corr.data(:,2);
+        else
+            white_light = ones(size(img,2), 1);
+        end
+        
+        white_light_roi = white_light(doc.roi.particle.x : doc.roi.particle.x+doc.roi.particle.wx - 1);
+
+        graph = nmssCreateGraph( img, doc.roi, white_light_roi);
+        
+        %fig = PlotGraph(graph, 'Vertically binned data of ROI');
+        fig = nmssPlotGraph(graph, 'Vertically binned data of ROI', 'particle');
+
+    end
+    
+    
+    % switch back the busy cursor to the normal arrow
+    set(handles.nmssSpecAnalysisDlg,'Pointer','arrow');
+
+
+
+
+
+% --- Executes when user attempts to close nmssSpecAnalysisDlg.
+function nmssSpecAnalysisDlg_CloseRequestFcn(hObject, eventdata, handles)
+% hObject    handle to nmssSpecAnalysisDlg (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    global doc;
+    
+    if (~CheckROIs())
+        return;
+    end
+    
+    % save settings into the global variable called doc
+    % doc.roi.particle = ConvertROIUnit2Pixel(doc.roi.particle);
+    
+    % ensure that the background ROIs have the same widths as the particle
+    % ROI...
+    doc.roi.bg1.wx = doc.roi.particle.wx;
+    doc.roi.bg1.wy = doc.roi.particle.wy;
+    doc.roi.bg2.wx = doc.roi.particle.wx;
+    doc.roi.bg2.wy = doc.roi.particle.wy;
+    
+    
+    
+    global app;
+    if (ishandle(app.nmssFigure))
+        parent_handles = guidata(app.nmssFigure);
+        % enable buttons which were disabled before
+        set(parent_handles.btnChangeAxisUnits, 'Enable', 'on');
+        set(parent_handles.btnCalibration, 'Enable', 'on');
+        set(parent_handles.btnWavelengthCalibration, 'Enable', 'on');
+        set(parent_handles.btnAnalysis, 'Enable', 'on');
+    end
+    
+
+% Hint: delete(hObject) closes the figure
+delete(hObject);
+
+
+
+function editPathWLSpectra_Callback(hObject, eventdata, handles)
+% hObject    handle to editPathWLSpectra (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editPathWLSpectra as text
+%        str2double(get(hObject,'String')) returns contents of editPathWLSpectra as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function editPathWLSpectra_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editPathWLSpectra (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+
+
+% --- Executes on button press in btnYSum.
+%function btnYSum_Callback(hObject, eventdata, handles)
+function graph = PeakIdentification_FittedBackground( white_light, roi_in_pixel)
+% Identifies the peaks using a threshold on the residuals obtained by 
+% a polynomial fit on the x-direction sum of the image
+% white_light - column vector containing the white light intensity values,
+%               this is used to normalize the measured signal
+% roi_in_pixel - region of interest. Only the x and the wx field is used to
+%                determine the x-range of the graphs (woring on the whole x-range 
+%                of the CCD chip is not useful as the border regions are very noisy)
+
+    global doc;
+
+    analysis = nmssResetAnalysisParam('fit_background');
+    graph = nmssSpecAnalysis(doc.img, white_light, roi_in_pixel, analysis);
+        
+
+
+% --- Executes on button press in btnYMax.
+function graph = PeakIdentification_Manual(handles, white_light, roi_in_pixel)
+% Identifies the peaks using the maximum of the image silouhette
+% along the x-direction
+% handles    structure with handles and user data (see GUIDATA)
+% white_light - column vector containing the white light intensity values,
+%               this is used to normalize the measured signal
+% roi_in_pixel - region of interest. Only the x and the wx field is used to
+%                determine the x-range of the graphs (woring on the whole x-range 
+%                of the CCD chip is not useful as the border regions are very noisy)
+
+    global doc;
+
+    analysis = nmssResetAnalysisParam('manual');
+    [analysis.threshold, analysis.std_weighing, ...
+            analysis.ROIExtendY, analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+        
+    graph = nmssSpecAnalysis(doc.img, white_light, roi_in_pixel, analysis);
+
+function graph = PeakIdentification_Automatic(handles, white_light, roi_in_pixel)
+% Identifies the peaks using the maximum of the image silouhette
+% along the x-direction
+% handles    structure with handles and user data (see GUIDATA)
+% white_light - column vector containing the white light intensity values,
+%               this is used to normalize the measured signal
+% roi_in_pixel - region of interest. Only the x and the wx field is used to
+%                determine the x-range of the graphs (woring on the whole x-range 
+%                of the CCD chip is not useful as the border regions are very noisy)
+
+    global doc;
+
+    analysis = nmssResetAnalysisParam('automatic');
+    [analysis.threshold, analysis.std_weighing, ...
+            analysis.ROIExtendY, analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+    
+    graph = nmssSpecAnalysis(doc.img, white_light, roi_in_pixel, analysis);
+
+%
+%        
+function [threshold, tuning_param, roi_extension_y, part_bg_roi_dist] = GetCustomizedThreshold(handles)
+    global doc;
+    threshold = 0;
+    tuning_param = 1;
+    roi_extension_y = 0;
+    
+    % check if the weighting parameter for the standard deviation is a
+    % number
+    if (~nmssValidateNumericEdit(handles.editStdDev_Weighting, 'Weighting for Std. Dev'))
+        return;
+    end
+    
+    % get ROI extension (in order to fine tune the particle ROI creation)
+    if (~nmssValidateNumericEdit(handles.editROIExtendY, 'Extend ROI vertically by'))
+        return;
+    end
+    tmp = str2double(get(handles.editROIExtendY, 'String'));
+    if (tmp >= 0)
+        roi_extension_y = tmp;
+    end
+    
+    % get distance between particle and background ROI
+    if (~nmssValidateNumericEdit(handles.editParticleBgROIDistance, 'Distance btw ROIs'))
+        return;
+    end
+    tmp = str2double(get(handles.editParticleBgROIDistance, 'String'));
+    if (tmp >= 0)
+        part_bg_roi_dist = tmp;
+    end
+    
+
+    % get max value of each row of the image
+    [ymax_of_image, col_index] = max(doc.img');
+
+    % the threshold above which the intensity values can be treated as
+    % signals
+    tuning_param = str2num(get(handles.editStdDev_Weighting,'String'));
+    threshold = mean(ymax_of_image) + tuning_param * std(ymax_of_image);
+    
+    
+    
+%    
+function fig = PlotGraph(graph, figname)
+% plots graph with blue if background could be identified and with red if
+% backgrouond couldn't be identified
+% graph - the graph structure
+    
+    %fig = nmssPlotGraph(graph, [figname, 'smoothed'], 'smoothed');
+    fig = nmssPlotGraph(graph, [figname, ' Normalized'], 'normalized');
+
+
+
+
+% --- Executes on button press in btnRefreshImage.
+function btnRefreshImage_Callback(hObject, eventdata, handles)
+% hObject    handle to btnRefreshImage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    RefreshImage(handles);
+
+
+
+function HighLightPeaks(graph)
+% draws dash-dot lines on the image indicating the peak locations
+%
+% INPUT:
+% graph -  a structure cell array containing information on each peak (as returned from nmssSpecAnalysis)
+    global app;
+    
+    % activate or create figure window
+    if (ishandle(app.nmssFigure))
+        figure(app.nmssFigure);
+    else
+        nmssFigure();
+    end
+
+    num_of_peaks = length(graph);
+    
+    for k=1:num_of_peaks
+        
+        global doc;
+        unit = doc.figure_axis.unit;
+        image_limts = nmssGetFullImageLimits(unit);
+        roi_in_unit = ConvertROIPixel2Unit(graph{k}.roi.particle, unit);
+        
+        peak_center_y = floor(roi_in_unit.y + roi_in_unit.wy * 0.5);
+        
+        % horizontal line to show the peak
+        line(image_limts.x, [peak_center_y  peak_center_y],'Color', 'b','LineWidth', 1, 'LineStyle', '-.');
+        
+        % vertical tick to indicate the max of the peak
+        [max_x_value, max_x_index] = max(graph{k}.normalized);
+        
+        max_x_px = graph{k}.offset_x_px + max_x_index;
+        
+        [max_x_pos, dummy] = nmssPixel_2_Unit(max_x_px, 0, unit);
+        
+        % x-axis can be in pixels or in nm, y-axis is always in pixels
+        line([max_x_pos, max_x_pos],[roi_in_unit.y, roi_in_unit.y + roi_in_unit.wy], ...
+            'Color', 'b','LineWidth', 1, 'LineStyle', '-.');
+        
+        % draw particle ROI
+        p_roi_in_unit = ConvertROIPixel2Unit(graph{k}.roi.particle, unit);
+        point1 = [p_roi_in_unit.x, p_roi_in_unit.y];
+        point2 = [p_roi_in_unit.x + p_roi_in_unit.wx, p_roi_in_unit.y + p_roi_in_unit.wy];
+        nmssDrawRectBetween2Points(point1, point2, 1, 'y');
+        
+        % draw background
+        % horizontal line to show the background
+        bg1_roi_in_unit = ConvertROIPixel2Unit(graph{k}.roi.bg1, unit);
+        point1 = [bg1_roi_in_unit.x, bg1_roi_in_unit.y];
+        point2 = [bg1_roi_in_unit.x + bg1_roi_in_unit.wx, bg1_roi_in_unit.y + bg1_roi_in_unit.wy];
+        nmssDrawRectBetween2Points(point1, point2, 1, 'y');
+        
+        bg2_roi_in_unit = ConvertROIPixel2Unit(graph{k}.roi.bg2, unit);
+        point1 = [bg2_roi_in_unit.x, bg2_roi_in_unit.y];
+        point2 = [bg2_roi_in_unit.x + bg2_roi_in_unit.wx, bg2_roi_in_unit.y + bg2_roi_in_unit.wy];
+        nmssDrawRectBetween2Points(point1, point2, 1, 'y');
+        
+        
+    end
+    
+
+% --- Executes on button press in btnFullXSpan.
+function btnFullXSpan_Callback(hObject, eventdata, handles)
+% hObject    handle to btnFullXSpan (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+    
+    roi_in_pixel.x = 1;
+    roi_in_pixel.wx = size(doc.img, 2);
+    roi_in_pixel.y = 1;
+    roi_in_pixel.wy = size(doc.img, 1);
+    
+    roi_in_unit = ConvertROIPixel2Unit(roi_in_pixel, doc.figure_axis.unit);
+        
+    set(handles.editRectStartX, 'String', num2str(roi_in_unit.x, '%4.3f') );
+    set(handles.editRectEndX, 'String', num2str(roi_in_unit.wx, '%4.3f'));
+    
+    % the width can only be set for particle ROI, background ROIs have the
+    % same width as the particle ROI
+    if(get(handles.rbParticle, 'Value'))
+        doc.roi.particle.exists = 1;
+        doc.roi.particle.x = roi_in_pixel.x;
+        doc.roi.particle.wx = roi_in_pixel.wx;
+    elseif(get(handles.rbBackground1, 'Value'))
+        doc.roi.bg1.exists = 1;
+        doc.roi.bg1.x = roi_in_pixel.x;
+        doc.roi.bg1.wx = roi_in_pixel.wx;
+    elseif(get(handles.rbBackground2, 'Value'))
+        doc.roi.bg2.exists = 1;
+        doc.roi.bg2.x = roi_in_pixel.x;
+        doc.roi.bg2.wx = roi_in_pixel.wx;
+    end
+    
+    UpdateROIs(handles);
+    
+
+
+% --- Executes on button press in btnFullYSpan.
+function btnFullYSpan_Callback(hObject, eventdata, handles)
+% hObject    handle to btnFullYSpan (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    global doc;
+
+    roi_in_pixel.x = 1;
+    roi_in_pixel.wx = size(doc.img, 2);
+    roi_in_pixel.y = 1;
+    roi_in_pixel.wy = size(doc.img, 1);
+    
+    roi_in_unit = ConvertROIPixel2Unit(roi_in_pixel, doc.figure_axis.unit);
+    
+    set(handles.editRectStartY, 'String', num2str(roi_in_unit.y, '%4.3f') );
+    set(handles.editRectEndY, 'String', num2str(roi_in_unit.wy , '%4.3f'));
+    % the width can only be set for particle ROI, background ROIs have the
+    % same width as the particle ROI
+    if(get(handles.rbParticle, 'Value'))
+        doc.roi.particle.exists = 1;
+        doc.roi.particle.y = roi_in_pixel.y;
+        doc.roi.particle.wy = roi_in_pixel.wy;
+    elseif(get(handles.rbBackground1, 'Value'))
+        doc.roi.bg1.exists = 1;
+        doc.roi.bg1.y = roi_in_pixel.y;
+        doc.roi.bg1.wy = roi_in_pixel.wy;
+    elseif(get(handles.rbBackground2, 'Value'))
+        doc.roi.bg2.exists = 1;
+        doc.roi.bg2.y = roi_in_pixel.y;
+        doc.roi.bg2.wy = roi_in_pixel.wy;
+    end
+
+    UpdateROIs(handles);
+
+
+
+% --- Executes on button press in btnClearROI.
+function btnClearROI_Callback(hObject, eventdata, handles)
+% hObject    handle to btnClearROI (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+     txt = {'This will delete all ROIs (particle, backgroound 1)';' ';'Are you sure you wanna delete all ROIs?'};
+     button = questdlg(txt,'nmss','Yes','No','No');
+     if (strcmp('No',button))  % user changed his mind...
+         return;
+     end
+    
+    global doc;
+    doc.roi.particle = nmssResetROI();
+    doc.roi.bg1 = nmssResetROI();
+    doc.roi.bg2 = nmssResetROI();
+    
+    roi_in_unit.particle = ConvertROIPixel2Unit(doc.roi.particle, doc.figure_axis.unit);
+    roi_in_unit.bg1 = ConvertROIPixel2Unit(doc.roi.bg1, doc.figure_axis.unit);
+    roi_in_unit.bg2 = ConvertROIPixel2Unit(doc.roi.bg2, doc.figure_axis.unit);
+
+    set(handles.editRectStartX, 'String', num2str(roi_in_unit.particle.x, '%.3f') );
+    set(handles.editRectStartY, 'String', num2str(roi_in_unit.particle.y, '%.3f') );
+    set(handles.editRectEndX, 'String', num2str(roi_in_unit.particle.wx, '%.3f'));
+    set(handles.editRectEndY, 'String', num2str(roi_in_unit.particle.wy, '%.3f'));
+
+    
+    UpdateROIs(handles);
+    
+    
+    
+
+
+
+% --- Executes on button press in btnExportTabDelimitedFile.
+function btnExportTabDelimitedFile_Callback(hObject, eventdata, handles)
+% hObject    handle to btnExportTabDelimitedFile (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    
+    if (CheckROIs())
+        % get image
+        global doc;
+        img = doc.img;
+
+        % white light - is either flat or if enabled read it from the white
+        % light data
+        white_light = ones(size(doc.img,2),1);
+        if (get(handles.cxEnableWLCorrection, 'Value'))
+            white_light = doc.white_light_corr.data(:,2);
+        end
+        
+%         unit = doc.figure_axis.unit;
+%         roi.particle = ConvertROIUnit2Pixel(doc.roi.particle);
+%         roi.bg1 = ConvertROIUnit2Pixel(doc.roi.bg1);
+%         roi.bg2 = ConvertROIUnit2Pixel(doc.roi.bg2);
+        
+        
+        % create graph structure containing graphs for signal, background
+        % and axis in nm if activated
+        graph = nmssCreateGraph(img, doc.roi, white_light);
+
+        [filename, dirname] = uiputfile('*.txt', 'Save Graph as ASCII...')
+        
+        % user hit cancel button
+        if (filename == 0)
+            return;
+        end
+
+        filepath = fullfile(dirname, filename);
+        try
+            if (size(graph.normalized,2) ~= 1)
+                graph.normalized = graph.normalized';
+            end
+            
+            if (size(graph.axis.x,2) ~= 1)
+                graph.axis.x = graph.axis.x';
+            end
+            
+            % prepare data to export
+            normalized_graph = [graph.axis.x, graph.normalized];
+                
+            % export data. tab delimited ascii file. 1st column =
+            % wavelength, 2nd column = intensity
+            dlmwrite(filepath, normalized_graph, 'delimiter', '\t', 'newline', 'pc', 'precision', '%10.2f');
+        catch
+            msg_txt = lasterr();
+            errordlg(msg_txt);
+        end
+    end
+
+
+% --- Executes on button press in btnShowWhiteLight.
+function btnShowWhiteLight_Callback(hObject, eventdata, handles)
+% hObject    handle to btnShowWhiteLight (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    global doc;
+    figure('Name', 'Normalized White Light Spectrum (max = 1)');
+    plot(doc.white_light_corr.data(:,1), doc.white_light_corr.data(:,2));
+    title(['File:', doc.white_light_corr.filepath], 'Interpreter', 'none');
+
+    
+    
+
+
+% --- Executes on button press in cxEnableBackground.
+function cxEnableBackground_Callback(hObject, eventdata, handles)
+% hObject    handle to cxEnableBackground (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of cxEnableBackground
+    global doc;
+
+    if (get(hObject,'Value'))
+        set(handles.rbBackground1, 'Enable', 'on');
+        doc.roi.bg1.exists = 1;
+    else
+        set(handles.rbBackground1, 'Value', 0);
+        set(handles.rbBackground1, 'Enable', 'off');
+        set(handles.rbParticle, 'Value', 1);
+        doc.roi.bg1.exists = 0;
+    end
+
+    UpdateROIs(handles);
+    
+    
+% --- Executes on button press in btnShowPeaks.
+function btnShowPeaks_Callback(hObject, eventdata, handles)
+% hObject    handle to btnShowPeaks (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+    % set mouse cursor to busy (watch)
+    set(handles.nmssSpecAnalysisDlg,'Pointer','watch');
+
+    % get image and check ROIs
+    global doc;
+    if (CheckROIs())
+    
+%         unit = doc.figure_axis.unit;
+%         roi_in_pixel = ConvertROIUnit2Pixel(doc.roi.particle);
+        roi_in_pixel = doc.roi.particle;
+        
+        
+        % activate image
+        UpdateROIs(handles);
+        
+        % white light that is used for normalilzation
+        white_light = ones(size(doc.img,2),1);
+        if (get(handles.cxEnableWLCorrection, 'Value'))
+            white_light = doc.white_light_corr.data(:,2);
+        end
+        
+        if (get(handles.rbPeakIdentifcation_YMax, 'Value'))
+            % identify bright spots by using user setting of threshold
+            graph = PeakIdentification_Manual(handles, white_light, roi_in_pixel);
+        elseif (get(handles.rbPeakIdentifcationAutomatic, 'Value'))
+            % identify bright spots automatically that is try to find the
+            % highest number of spots
+            graph = PeakIdentification_Automatic(handles, white_light, roi_in_pixel);
+        else
+            error('Unknown peak identification method. Contact the developer')
+            return;
+        end
+        
+        % check if any graph has been returned
+        if (isempty(graph))
+            errordlg('No peak found!');
+            return;
+        end
+        
+        HighLightPeaks(graph);
+
+        PlotGraph(graph, 'Particle Spectrum');
+    end
+    
+    % restore arrow mouse cursor
+    set(handles.nmssSpecAnalysisDlg,'Pointer','arrow');
+
+
+% --- Executes during object creation, after setting all properties.
+function editStdDev_Weighting_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editStdDev_Weighting (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+% --- Executes on button press in rbPeakIdentifcation_YMax.
+function rbPeakIdentifcation_YMax_Callback(hObject, eventdata, handles)
+% hObject    handle to rbPeakIdentifcation_YMax (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of rbPeakIdentifcation_YMax
+    global doc;
+    if (get(hObject,'Value'))
+        %doc.analysis.method = 'absolute_maximum';
+        doc.analysis.method = 'manual';
+        [doc.analysis.threshold, doc.analysis.std_weighing, ...
+            doc.analysis.ROIExtendY, doc.analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+    else
+        % do not allow unkclicking the radiobutton
+        set(hObject,'Value', 1);
+    end
+
+
+function editStdDev_Weighting_Callback(hObject, eventdata, handles)
+% hObject    handle to editStdDev_Weighting (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editStdDev_Weighting as text
+%        str2double(get(hObject,'String')) returns contents of editStdDev_Weighting as a double
+    global doc;
+    
+        [doc.analysis.threshold, doc.analysis.std_weighing, ...
+            doc.analysis.ROIExtendY, doc.analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+
+
+% --- Executes on button press in rbPeakIdentifcationAutomatic.
+function rbPeakIdentifcationAutomatic_Callback(hObject, eventdata, handles)
+% hObject    handle to rbPeakIdentifcationAutomatic (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of rbPeakIdentifcationAutomatic
+    global doc;
+    if (get(hObject,'Value'))
+        %doc.analysis.method = 'absolute_maximum';
+        doc.analysis.method = 'automatic';
+        [doc.analysis.threshold, doc.analysis.std_weighing, ...
+            doc.analysis.ROIExtendY, doc.analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+    else
+        % do not allow unkclicking the radiobutton
+        set(hObject,'Value', 1);
+    end
+
+
+function editROIExtendY_Callback(hObject, eventdata, handles)
+% hObject    handle to editROIExtendY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editROIExtendY as text
+%        str2double(get(hObject,'String')) returns contents of editROIExtendY as a double
+    global doc;
+    [doc.analysis.threshold, doc.analysis.std_weighing, ...
+        doc.analysis.ROIExtendY, doc.analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+
+% --- Executes during object creation, after setting all properties.
+function editROIExtendY_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editROIExtendY (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+
+
+
+
+function editParticleBgROIDistance_Callback(hObject, eventdata, handles)
+% hObject    handle to editParticleBgROIDistance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of editParticleBgROIDistance as text
+%        str2double(get(hObject,'String')) returns contents of editParticleBgROIDistance as a double
+    global doc;
+    [doc.analysis.threshold, doc.analysis.std_weighing, ...
+        doc.analysis.ROIExtendY, doc.analysis.particleBgROIDistance] = GetCustomizedThreshold(handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function editParticleBgROIDistance_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to editParticleBgROIDistance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: editParticleBgROIDistance controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc
+    set(hObject,'BackgroundColor','white');
+else
+    set(hObject,'BackgroundColor',get(0,'defaultUicontrolBackgroundColor'));
+end
+
+

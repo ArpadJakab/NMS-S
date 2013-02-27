@@ -1,0 +1,93 @@
+function [fitcurve, fittedindices] = nmssFitPeak(x_axis, values, fittype)
+% fittedindices -  the indices of the values in 'values' which have been
+% fitted
+% fittype - 'poly2' for a parabola fitting of the peak
+%           'lorentz' for a lorentz fitting of the peak
+    fit_x = [];
+    fitcurve = [];
+    fittedindices = [];
+
+    if (size(x_axis,2) ~= 1) 
+        x_axis = x_axis'; % make it to a column vector
+    end;
+    
+    if (size(values,2) ~= 1) 
+        values = values'; % make it to a column vector
+    end;
+    
+    
+
+    if (strcmp(fittype, 'poly2'))
+        [fitcurve, fittedindices] = FitPoly2(x_axis, values);
+    elseif (strcmp(fittype, 'lorentz'))
+        [ ERes FWHM maxInt lorentz_curve] = nmssLorentzFit( x_axis, values , n);
+        fit_x = x_axis;
+        fitcurve = lorentz_curve;
+        fittedindices = [1:length(values)];
+    end
+
+
+% % fit top of the peak with a parabola
+% function [fitcurve, fittedindices] = FitPoly2(x_axis_eV, spec_eV)
+%     fitcurve = [];
+%     fittedindices = [];
+%     
+%     peak_min_int = min(spec_eV);
+%     peak_max_int = max(spec_eV);
+% 
+%     fittedindices = 1:length(spec_eV);
+% 
+%     if (length(fittedindices) > 3)
+%         fittedcurve = spec_eV;
+%         fit_x = x_axis_eV;
+%         
+%         fresult = fit(fit_x, fittedcurve, 'poly2'); % poly2 = parabolic curve (polynome 2nd order)
+%         fitcurve = fresult(fit_x);
+%     end
+
+
+% fit top of the peak with a parabola
+function [Eres, maxInt, fitcurve, fittedindices] = FitPoly2(x_axis_eV, spec_eV)
+    fitcurve = [];
+    fittedindices = [];
+    Eres = NaN;
+    maxInt = NaN;
+    
+    peak_min_int = min(spec_eV);
+    peak_max_int = max(spec_eV);
+
+    fittedindices = 1:length(spec_eV);
+
+    if (length(fittedindices) > 3)
+        fittedcurve = spec_eV;
+        fit_x = x_axis_eV;
+        
+        f = fit(fit_x, fittedcurve, 'poly2'); % poly2 = parabolic curve (polynome 2nd order)
+        fitcurve = f(fit_x);
+        
+        % get polynom parameters
+        % f(x) = p1*x^2 + p2*x + p3 = y
+        p3 = f(0);
+        
+        % using arguments 1 and -1 to have two equations to find p1 and p2
+        p1 = (f(1) + f(-1) - 2*p3) / 2;
+        p2 = (f(1) - f(-1)) / 2;
+        
+        % maximum of the parabola is where the first derivative is zero
+        % f'(X) = 2*p1*x + p2 = 0
+        % thus Eres = x0 = -p2 / (2*p1), if p1 < 0 
+        if (p1 <= 0)
+            Eres = -p2 / (2*p1);
+        else
+            [dummy, i] = max(fitcurve);
+            Eres = x_axis_eV(i);
+        end
+        
+    end
+    
+
+    
+
+
+
+

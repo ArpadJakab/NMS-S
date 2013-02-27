@@ -1,0 +1,25 @@
+INSTALLATION PROCEDURE OF NMSS (Nano Multi Scanning Spectrometer)
+
+Simple installation:
+--------------------
+1. Copy Z:\Group\Our Software\NMS-S to your target directory (you can also start the program from here, but it is not recommended)
+
+2. Add the <target_dir>\NMS-S\project with subdirectories to Matlab under the menu File->Set Path...
+
+3. You can start the software with entering "nmss" into Matlab's command prompt
+
+
+
+Developer installation:
+-----------------------
+1. CVS checkout: check out NMSS project from the repostitory into target directory <target_dir>
+
+2. use following command in command prompt (DOS window) to get the dll-s, which are not in the repository due to problems with checking in binary files into the repository:
+
+xcopy "Z:\Group\Our Software\NMS-S\project\NMSS_Camera\*.dll" "<target_dir>\NMS-S\project\NMSS_Camera\" /E /Y
+xcopy "Z:\Group\Our Software\NMS-S\project\NMSS_PiezoStage\*.dll" "<target_dir>\NMS-S\project\NMSS_PiezoStage\" /E /Y
+xcopy "Z:\Group\Our Software\NMS-S\project\NMSS_Spectrograph\*.dll" "<target_dir>\NMS-S\project\NMSS_Spectrograph\" /E /Y
+
+3. Add the <target_dir>\NMS-S\project with subdirectories to Matlab under the menu File->Set Path...
+
+4. You can start the software with entering "nmss" into Matlab's command prompt

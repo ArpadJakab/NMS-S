@@ -1,0 +1,71 @@
+Dear Arpad Jakab,
+
+This error occur under 3 circumstances:
+1. The PVCAM.ini file is missing or there are no entries in it. Run the
+RSConfig.exe program to generate the ini file. It should look like this:
+[Camera_1]
+Type=1
+Name=Camera1a
+Driver=apausb.sys:pixis
+Port=0
+ID=1001070001
+2. Another occurrence is when the program is started before the camera
+is turned on. The camera should be turned on before you start your
+program or acquire data.
+3. Also make sure that Windows is recognizing that you have a USB device
+connected. Sometimes Windows does not see the USB device, therefore
+there is no driver loaded.
+
+The drivers for this camera can be downloaded from the link below.
+
+ftp://ftp.piacton.com/Software/Official/Drivers/WinXP/
+
+Regards,
+
+Kevin Foster
+Technical Support Engineer
+ 3660 Quakerbridge Road
+Trenton, New Jersey 08619
+
+
+-----Original Message-----
+From: techsupport@piacton.com [mailto:techsupport@piacton.com] 
+Sent: Thursday, August 30, 2007 11:08 AM
+To: Tech_Support
+Subject: Princeton Instruments: Software Request
+
+Form Submission at 8/30/2007 11:07 AM
+
+Name: Arpad Jakab
+Company: Inst. f?r Physikalische Chemie, Universit?t Mainz
+Address1: Jakob-Welder-Weg 11
+Address2: 
+City: Mainz
+Postal Code: 55128
+State : INTL
+Country : Germany
+Phone: 
+Email: jakab@uni-mainz.de
+Application : Luminescence
+Application (Other): 
+Serial Number: 1912060008
+Model : Dell
+Model Other: Optiplex 745
+OperatingSystem : Windows XP
+OS (Other): 
+Processor : Intel Pentium 4
+Processor (Other): 
+Speed: 3GHz
+RAM: 1 GB
+HD: 
+Comments: I've got a PIXIS 400. Using PVCAM I'm experiencing in
+reliability of image acquisition. Occasionally the camera doesn't
+respond and I get the "C0_CNTRL_CREATE_FAILED: Coldn't create controller
+object for camera".
+Could you please send me the most recent released driver for this
+camera. I hope this might fix the problems.
+
+Thanks
+Arpad Jakab
+
+

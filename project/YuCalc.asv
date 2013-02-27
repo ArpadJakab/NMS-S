@@ -1,0 +1,184 @@
+function [FOMStar, FOM, Q, res_en, FWHM, yu_nm] = FCalc(corr_part, n_start, n_end, varargin)
+    % corr_part - data strucutre as coming out from the image overlay
+    % routine
+    % n_start - the starting index of refraction
+    % n_end - the final index of refraction
+    % start_data_ind - the data set corresponding to n_start
+    % end_data_ind - the data set corresponding to n_end
+    
+    start_data_ind = 1;
+    end_data_ind = 2;
+    
+    
+    usr_response = 1;
+    hFomFigure = 0;
+    hDiffSpecFigure = 0;
+    hTwoSpecFigure = 0;
+
+    % display each spectrum difference curve?
+    verbose = true;
+    
+    % start and end index (useful if more than two correlated data set are
+    % in the corr_part array
+    if (length(varargin) == 2)
+        start_data_ind = varargin{1};
+        end_data_ind = varargin{2};
+    end
+    
+    if (verbose)
+        hFomFigure = figure;
+        title('FOM*');
+        xlabel('Res. Wavelength (nm)');
+        ylabel('FOM*');
+        
+        hDiffSpecFigure = figure;
+        xlabel('Wavelength (nm)');
+        title(['Spectrum difference']);
+        hTwoSpecFigure = figure;
+        xlabel('Wavelength (nm)');
+        title(['Spectrum (blue): ', num2str(n_start),'Spectrum (red): ', num2str(n_end)]);
+    end
+    
+    % check if x-axes match - if not change the indices accordingly
+    x_axis1 = corr_part(1).pdata{start_data_ind}.graph.axis.x;
+    x_axis2 = corr_part(1).pdata{end_data_ind}.graph.axis.x;
+    
+    start_index1 = 1;
+    end_index1 = length(x_axis1);
+    start_index2 = 1;
+    end_index2 = length(x_axis2);
+    
+    if (x_axis1(1) < x_axis2(1) && x_axis1(end) > x_axis2(end))
+        start_index1 = find(x_axis1 >= x_axis2(1), 1, 'first');
+        end_index1 = find(x_axis1 <= x_axis2(end), 1, 'last');
+    elseif (x_axis1(1) < x_axis2(1) && x_axis1(end) < x_axis2(end))
+        start_index1 = find(x_axis1 >= x_axis2(1), 1, 'first');
+        end_index2 = find(x_axis2 <= x_axis1(end), 1, 'last');
+    elseif (x_axis1(1) > x_axis2(1) && x_axis1(end) < x_axis2(end))
+        start_index2 = find(x_axis2 >= x_axis1(1), 1, 'first');
+        end_index2 = find(x_axis2 <= x_axis1(end), 1, 'last');
+    elseif (x_axis1(1) > x_axis2(1) && x_axis1(end) > x_axis2(end))
+        start_index2 = find(x_axis2 >= x_axis1(1), 1, 'first');
+        end_index1 = find(x_axis1 <= x_axis2(end), 1, 'last');
+    end
+    x_axis = corr_part(1).pdata{start_data_ind}.graph.axis.x(start_index1:end_index1);
+    
+    l = length(corr_part);
+    k = 1;
+    for i=1:l
+        
+        spec1 = corr_part(i).pdata{start_data_ind}.graph.normalized(start_index1:end_index1);
+        spec2 = corr_part(i).pdata{end_data_ind}.graph.normalized(start_index2:end_index2);
+        
+        res_en_1 = corr_part(i).pdata{start_data_ind}.res_energy;
+        res_en_2 = corr_part(i).pdata{end_data_ind}.res_energy;
+        max_intensity_1 = corr_part(i).pdata{start_data_ind}.max_intensity;
+        max_intensity_2 = corr_part(i).pdata{end_data_ind}.max_intensity;
+        
+        fwhm_left_1_index = corr_part(i).pdata{end_data_ind}.max_intensity
+    
+        fit1_x = 1240 ./ corr_part(i).pdata{start_data_ind}.fit_x;
+        fit1_y = corr_part(i).pdata{start_data_ind}.fit_y;
+        fit2_x = 1240 ./ corr_part(i).pdata{end_data_ind}.fit_x;
+        fit2_y = corr_part(i).pdata{end_data_ind}.fit_y;
+        
+        spec_diff(i,:) = fit1_y - fit2_y;
+        
+        % find maximum of the curve
+        % -------------------------------------------------
+        % smooth
+        smooth_spec_diff = spec_diff(i,:);
+        % find maximum position of the abs or squared curve
+        [maxima minima] = nmssFindExtrema(smooth_spec_diff, 3);
+        
+        try
+            max_pos = maxima(1); % we take the first maximum starting from the red side
+        catch
+            disp(lasterr);
+            keyboard;
+            return;
+        end
+        
+        %[max_int, max_pos] = max(smooth_spec_diff);
+        % cut off ouliers if they are at the first or the last position
+        % of the vector (smoothing artefact)
+        
+        % 4. find the spectrum intensities
+        I1 = spec1(max_pos);
+        I2 = spec2(max_pos);
+        
+        % 5. calc FOMStar
+        tmpFOMStar(1) = 1240 / res_en_1;
+        tmpFOMStar(2) = (I1 - I2) / (0.5 * (I1+I2)) / (n_end - n_start);
+        if (verbose)
+            % display curve
+            figure(hFomFigure); hold on;
+            hPlot(k) = plot(tmpFOMStar(1), tmpFOMStar(2), 'r.');
+            
+            
+            figure(hTwoSpecFigure);
+            plot(x_axis, spec1);
+            xlabel('Wavelength (nm)');
+            title(['Spectrum (blue): ', num2str(n_start),'Spectrum (red): ', num2str(n_end)]);
+            hold on;
+            plot(x_axis, spec2, 'r'); 
+            plot(fit1_x, fit1_y, 'g');
+            plot(fit2_x, fit2_y, 'k');
+            
+            yLimits = ylim;
+            [v, max_pos1] = max(fit1_y);
+            [v, max_pos2] = max(fit2_y);
+            line([1240/res_en_1, 1240/res_en_1], [yLimits(1), yLimits(2)], 'LineStyle', '--', 'Color', 'g');
+            line([1240/res_en_2, 1240/res_en_2], [yLimits(1), yLimits(2)], 'LineStyle', '--', 'Color', 'k');
+            hold off;
+            
+            figure(hDiffSpecFigure);
+            cla;
+            plot(fit1_x, smooth_spec_diff);
+            title(['Spectrum difference, max @ ', num2str(fit1_x(max_pos)), ' nm']);
+            hold off;
+            usr_response = menu('Take this?', 'yes', 'no', 'quit');
+            if (usr_response == 2)
+                delete(hPlot(k));
+                continue;
+            end
+            
+            
+            set(hPlot, 'Color', 'b');
+        end
+        
+        FOMStar(k,1) = i;
+        FOMStar(k,2) = tmpFOMStar(1);
+        FOMStar(k,3) = tmpFOMStar(2);
+        k = k+1;
+        if (verbose)
+            % quit? (this user response orginates from the menu displayed
+            % earlier
+            if(usr_response == 3)
+                break;
+            end
+        end
+        
+    end
+    
+    l = length(FOMStar(:,1));
+    for k=1:l; 
+        i = FOMStar(k,1);
+        res_en(i,1) = corr_part(i).pdata{start_data_ind}.res_energy; 
+        res_en(i,2) = corr_part(i).pdata{end_data_ind}.res_energy; 
+        FWHM(i,1) = corr_part(i).pdata{start_data_ind}.FWHM; 
+        FWHM(i,2) = corr_part(i).pdata{end_data_ind}.FWHM; 
+    end
+    %figure; plot(res_en(:,1)); hold on; plot(res_en(:,2))
+    yu=(res_en(:,1)-res_en(:,2))/(n_end-n_start);
+    yu_nm = (1240./res_en(:,2) - 1240./res_en(:,1))/(n_end-n_start);
+    FOM=yu./FWHM(:,1);
+    Q = res_en(:,1)./FWHM(:,1);
+    f1 = figure;plot(1241./res_en(:,1),FOM,'.')
+    f2 = figure;plot(1241./res_en(:,1),Q,'.')
+    f3 = figure;plot(res_en(:,1),FWHM(:,1),'.')
+    f4 = figure;plot(res_en(:,1),yu,'.');
+    figure(f1); title('FOM');
+    figure(f2); title('Q');
+    figure(f3); title('FWHM');
+    figure(f4); title('Yu');

@@ -1,0 +1,11 @@
+This document describes the NMSS hardware module drivers compilation procedure
+----------------------------------
+
+1. Using Matlab, enter the directory containing the module (CAM, PS, SPEC)
+
+2. Using the Matlab command window start the make_nmssXXXX.m files, where
+	XXXX stands for one of these: CAM, PS, SPEC
+
+3. The correstponding dll-s are then being generated in the same directory where the c++ modules are. These dlls have to be in the accessable for matlab during the run time of NMSS so make sure that the Matlab path is set accordingly
+
+3.a IMPORTANT: the ARC_SpectraPro.dll has to be in the same directory with the nmss.m, because this dynamically linked library is linked only during run time and Matlab is only looking in the same directory where nmss.m is.
